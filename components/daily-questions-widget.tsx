@@ -1,30 +1,40 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/colors';
+import { MicCircleIcon } from '@/components/ui/icon';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 
 interface DailyQuestionsWidgetProps {
   onPress: () => void;
 }
 
 export function DailyQuestionsWidget({ onPress }: DailyQuestionsWidgetProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
   return (
     <Pressable
       style={({ pressed }) => [
         styles.container,
-        { opacity: pressed ? 0.7 : 1 },
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: pressed ? 0.7 : 1,
+        },
       ]}
       onPress={onPress}
     >
       <View style={styles.content}>
         <View style={styles.textContainer}>
-          <Text style={styles.title}>3 Questions of the Day</Text>
-          <Text style={styles.description}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            3 Questions of the Day
+          </Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
             Answer today&apos;s questions by voice and get instant feedback
           </Text>
         </View>
         <View style={styles.iconContainer}>
-          <Ionicons name="mic-circle" size={60} color={Colors.primary} />
+          <MicCircleIcon size="3xl" variant="primary" />
         </View>
       </View>
     </Pressable>
@@ -33,18 +43,12 @@ export function DailyQuestionsWidget({ onPress }: DailyQuestionsWidgetProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.cardBackground,
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 20,
-    marginVertical: 10,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginHorizontal: Spacing.base,
+    marginVertical: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Shadow.medium,
   },
   content: {
     flexDirection: 'row',
@@ -53,18 +57,16 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
-    marginRight: 16,
+    marginRight: Spacing.base,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 8,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing.sm,
   },
   description: {
-    fontSize: 14,
-    color: Colors.textLight,
-    lineHeight: 20,
+    fontSize: Typography.fontSize.sm,
+    lineHeight: Typography.fontSize.md * Typography.lineHeight.normal,
   },
   iconContainer: {
     justifyContent: 'center',

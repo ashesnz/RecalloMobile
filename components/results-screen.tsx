@@ -7,8 +7,10 @@ import {
   Pressable,
 } from 'react-native';
 import { QuestionResult } from '@/types/question';
-import { Colors } from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
+import { ChatIcon, RefreshIcon } from '@/components/ui/icon';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import { Colors as ColorPalette } from '@/constants/colors';
 import { getMockResults, mockQuestions } from '@/data/mock-data';
 
 interface ResultsScreenProps {
@@ -18,28 +20,32 @@ interface ResultsScreenProps {
 }
 
 export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsScreenProps) {
+  const colorScheme = useColorScheme();
+  const colors = ThemeColors[colorScheme ?? 'light'];
+
   // Use mock results if no results are provided
   const displayResults = results.length === 0
     ? getMockResults(mockQuestions.map(q => q.id))
     : results;
 
   const getGradeColor = (grade: string) => {
+    const gradeColors = colorScheme === 'dark' ? ColorPalette.dark : ColorPalette.light;
     switch (grade) {
-      case 'A': return Colors.gradeA;
-      case 'B': return Colors.gradeB;
-      case 'C': return Colors.gradeC;
-      case 'D': return Colors.gradeD;
-      case 'F': return Colors.gradeF;
-      default: return Colors.primary;
+      case 'A': return gradeColors.gradeA;
+      case 'B': return gradeColors.gradeB;
+      case 'C': return gradeColors.gradeC;
+      case 'D': return gradeColors.gradeD;
+      case 'F': return gradeColors.gradeF;
+      default: return colors.primary;
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Individual Question Results */}
         <View style={styles.resultsContainer}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
             Your Results
           </Text>
 
@@ -48,13 +54,17 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
               key={result.questionId}
               style={({ pressed }) => [
                 styles.resultCard,
-                { opacity: pressed ? 0.7 : 1 },
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
               ]}
               onPress={() => onQuestionPress(result)}
             >
               <View style={styles.resultHeader}>
                 <View style={styles.resultHeaderLeft}>
-                  <Text style={styles.questionNumber}>Q{index + 1}</Text>
+                  <Text style={[styles.questionNumber, { color: colors.text }]}>Q{index + 1}</Text>
                   <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(result.grade) }]}>
                     <Text style={styles.gradeBadgeText}>{result.grade}</Text>
                   </View>
@@ -64,13 +74,13 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
                 </Text>
               </View>
 
-              <Text style={styles.questionText} numberOfLines={2}>
+              <Text style={[styles.questionText, { color: colors.textSecondary }]} numberOfLines={2}>
                 {result.question}
               </Text>
 
               <View style={styles.feedbackPreview}>
-                <Ionicons name="chatbubble-outline" size={16} color={Colors.textLight} />
-                <Text style={styles.feedbackText} numberOfLines={1}>
+                <ChatIcon size="xs" variant="textSecondary" />
+                <Text style={[styles.feedbackText, { color: colors.textSecondary }]} numberOfLines={1}>
                   Tap to view feedback
                 </Text>
               </View>
@@ -83,11 +93,11 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
           <Pressable
             style={({ pressed }) => [
               styles.restartButton,
-              { opacity: pressed ? 0.7 : 1 },
+              { backgroundColor: colors.primary, opacity: pressed ? 0.7 : 1 },
             ]}
             onPress={onRestart}
           >
-            <Ionicons name="refresh" size={24} color={Colors.white} />
+            <RefreshIcon size="md" color="#ffffff" />
             <Text style={styles.restartButtonText}>Start New Session</Text>
           </Pressable>
         )}
@@ -99,70 +109,28 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  overallCard: {
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    marginBottom: 24,
-    backgroundColor: Colors.white,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 16,
-  },
-  overallScoreContainer: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  gradeCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  gradeText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: Colors.white,
-  },
-  scoreText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textLight,
+    padding: Spacing.lg,
+    paddingBottom: Spacing['3xl'],
   },
   resultsContainer: {
-    gap: 12,
+    gap: Spacing.md,
   },
   sectionTitle: {
-    marginBottom: 8,
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
+    marginBottom: Spacing.sm,
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
   },
   resultCard: {
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-    backgroundColor: Colors.cardBackground,
+    padding: Spacing.base,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.md,
+    borderWidth: 1,
+    ...Shadow.small,
   },
   resultHeader: {
     flexDirection: 'row',
@@ -172,57 +140,53 @@ const styles = StyleSheet.create({
   resultHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   questionNumber: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
   },
   gradeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
   },
   gradeBadgeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: '#ffffff',
   },
   scoreLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
   },
   questionText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: Colors.textLight,
+    fontSize: Typography.fontSize.base,
+    lineHeight: Typography.fontSize.base * Typography.lineHeight.normal,
   },
   feedbackPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   feedbackText: {
-    fontSize: 14,
-    color: Colors.textLight,
+    fontSize: Typography.fontSize.sm,
     fontStyle: 'italic',
   },
   restartButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 24,
-    backgroundColor: Colors.buttonPrimary,
+    gap: Spacing.sm,
+    padding: Spacing.base,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.xl,
+    ...Shadow.medium,
   },
   restartButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: '#ffffff',
   },
 });
-

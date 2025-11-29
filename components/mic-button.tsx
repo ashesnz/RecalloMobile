@@ -6,8 +6,11 @@ import {
   Pressable,
   Animated,
 } from 'react-native';
-import { Colors } from '@/constants/colors';
+import { MicIcon } from '@/components/ui/icon';
 import { Ionicons } from '@expo/vector-icons';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow, IconSize } from '@/constants/theme';
+import { Colors as ColorPalette } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 interface MicButtonProps {
@@ -17,6 +20,9 @@ interface MicButtonProps {
 }
 
 export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate }: MicButtonProps) {
+  const colorScheme = useColorScheme();
+  const colors = ThemeColors[colorScheme ?? 'light'];
+  const gradeColors = colorScheme === 'dark' ? ColorPalette.dark : ColorPalette.light;
   const [isRecording, setIsRecording] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(1));
   const transcriptIntervalRef = React.useRef<any>(null);
@@ -69,7 +75,7 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
 
   return (
     <View style={styles.container}>
-      <Text style={styles.instruction}>
+      <Text style={[styles.instruction, { color: colors.textSecondary }]}>
         {isRecording ? 'Recording... Release to stop' : 'Hold to record your answer'}
       </Text>
 
@@ -80,22 +86,22 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
           style={[
             styles.micButton,
             {
-              backgroundColor: isRecording ? Colors.recording : Colors.primary,
+              backgroundColor: isRecording ? gradeColors.recording : colors.primary,
             },
           ]}
         >
           <Ionicons
             name={isRecording ? 'stop-circle' : 'mic'}
-            size={48}
-            color={Colors.white}
+            size={IconSize['2xl']}
+            color="#ffffff"
           />
         </Pressable>
       </Animated.View>
 
       {isRecording && (
         <View style={styles.recordingIndicator}>
-          <View style={styles.recordingDot} />
-          <Text style={styles.recordingText}>Recording</Text>
+          <View style={[styles.recordingDot, { backgroundColor: gradeColors.recording }]} />
+          <Text style={[styles.recordingText, { color: gradeColors.recording }]}>Recording</Text>
         </View>
       )}
     </View>
@@ -105,43 +111,33 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    gap: 20,
+    gap: Spacing.lg,
   },
   instruction: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.base,
     textAlign: 'center',
-    color: Colors.textLight,
   },
   micButton: {
     width: 100,
     height: 100,
-    borderRadius: 50,
+    borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    ...Shadow.large,
   },
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   recordingDot: {
     width: 12,
     height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.recording,
+    borderRadius: BorderRadius.full,
   },
   recordingText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.recording,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });
 
