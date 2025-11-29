@@ -1,26 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/components/results-screen';
 import { FeedbackDetail } from '@/components/feedback-detail';
 import { DailyQuestionsWidget } from '@/components/daily-questions-widget';
+import { QuestionSettingsWidget } from '@/components/question-settings-widget';
+import { QuestionSettingsForm } from '@/components/question-settings-form';
 import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
+import { QuestionSettings } from '@/types/project';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/use-auth';
 import { getPersonalizedGreeting } from '@/utils/greeting';
+import { settingsStorage } from '@/services/settings-storage';
+import { apiService } from '@/services/api';
 
-type AppState = 'dashboard' | 'questions' | 'results' | 'feedback';
+type AppState = 'dashboard' | 'questions' | 'results' | 'feedback' | 'settings';
 
 export default function HomeScreen() {
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
+  const [questionSettings, setQuestionSettings] = useState<QuestionSettings | null>(null);
+  const [projectName, setProjectName] = useState<string | undefined>(undefined);
   const { user } = useAuth();
+
+  // Load saved settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  // Load project name when settings change
+  useEffect(() => {
+    if (questionSettings?.projectId) {
+      loadProjectName(questionSettings.projectId);
+    }
+  }, [questionSettings?.projectId]);
+
+  const loadSettings = async () => {
+    try {
+      const savedSettings = await settingsStorage.getSettings();
+      if (savedSettings) {
+        setQuestionSettings(savedSettings);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const loadProjectName = async (projectId: string) => {
+    try {
+      const projects = await apiService.getProjects();
+      const project = projects.find((p) => p.id === projectId);
+      setProjectName(project?.name);
+    } catch (error) {
+      console.error('Error loading project name:', error);
+    }
+  };
 
   const handleStartSession = () => {
     setResults([]);
     setAppState('questions');
+  };
+
+  const handleOpenSettings = () => {
+    setAppState('settings');
+  };
+
+  const handleSaveSettings = (settings: QuestionSettings) => {
+    setQuestionSettings(settings);
+    setAppState('dashboard');
+  };
+
+  const handleCancelSettings = () => {
+    setAppState('dashboard');
   };
 
 
@@ -56,8 +109,25 @@ export default function HomeScreen() {
           </Text>
 
           <DailyQuestionsWidget onPress={handleStartSession} />
+
+          <QuestionSettingsWidget
+            onPress={handleOpenSettings}
+            projectName={projectName}
+            scheduledTime={questionSettings?.scheduledTime || undefined}
+          />
         </View>
       </ScrollView>
+    );
+  }
+
+  // Settings Screen
+  if (appState === 'settings') {
+    return (
+      <QuestionSettingsForm
+        onSave={handleSaveSettings}
+        onCancel={handleCancelSettings}
+        initialSettings={questionSettings}
+      />
     );
   }
 

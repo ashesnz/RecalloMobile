@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { API_CONFIG, API_TIMEOUT } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
+import { Project } from '@/types/project';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -162,6 +163,19 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Get user profile error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Projects endpoints
+  async getProjects(): Promise<Project[]> {
+    try {
+      console.log('[API] Fetching projects');
+      const response = await this.api.get<Project[]>(API_CONFIG.ENDPOINTS.PROJECTS);
+      console.log('[API] Projects fetched:', response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.error('Get projects error:', error);
       throw this.handleError(error);
     }
   }
