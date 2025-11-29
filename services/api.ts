@@ -29,6 +29,8 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        // Log all outgoing requests for debugging
+        console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },
       (error) => Promise.reject(error)
@@ -125,12 +127,23 @@ class ApiService {
 
   async logout(): Promise<void> {
     console.log('[API] Logout started');
+    const token = await this.getToken();
+    console.log('[API] Token exists before logout:', token ? 'YES' : 'NO');
+
     try {
-      console.log('[API] Calling logout endpoint');
-      await this.api.post(API_CONFIG.ENDPOINTS.LOGOUT);
-      console.log('[API] Logout endpoint responded successfully');
+      console.log('[API] Calling logout endpoint:', API_CONFIG.ENDPOINTS.LOGOUT);
+      const response = await this.api.post(API_CONFIG.ENDPOINTS.LOGOUT);
+      console.log('[API] Logout endpoint responded:', response.status, response.statusText);
     } catch (error) {
       console.error('[API] Logout API error:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('[API] Logout error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          message: error.message,
+        });
+      }
       // Continue to clear token even if API call fails
     } finally {
       console.log('[API] Clearing token from storage');

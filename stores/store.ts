@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { configureStore, type Action, type AnyAction } from '@reduxjs/toolkit';
+import { configureStore, type AnyAction } from '@reduxjs/toolkit';
 import {
   persistStore,
   persistReducer,

@@ -72,35 +72,41 @@ export function useAuth() {
   );
 
   const handleLogout = useCallback(async () => {
-    console.log('[Auth] Logout started');
-
-    // Step 1: Call logout API to clear server-side session
     try {
-      await AuthService.logout();
-      console.log('[Auth] Logout API completed');
+      console.log('[Auth] Logout started');
+
+      // Step 1: Call logout action (clears server session and token from storage)
+      await dispatch(authActions.logout());
+      console.log('[Auth] Logout action completed');
+
+      // Step 2: Dispatch logout reducer action to reset Redux state to initial
+      dispatch(logout());
+      console.log('[Auth] Redux state reset');
+
+      // Step 3: Purge persistor to completely clear persisted state from AsyncStorage
+      await persistor.purge();
+      console.log('[Auth] Persistor purged');
+
+      // Step 4: Also manually clear the persist key as backup
+      try {
+        await AsyncStorage.removeItem('persist:Root');
+        console.log('[Auth] AsyncStorage persist key removed');
+      } catch (error) {
+        console.error('[Auth] Error clearing AsyncStorage:', error);
+      }
+
+      console.log('[Auth] Logout completed successfully');
     } catch (error) {
-      console.error('[Auth] Logout API error (non-critical):', error);
-      // Ensure token is cleared even if API call fails
-      await AuthService.clearToken();
+      console.error('[Auth] Logout error:', error);
+      // Even if there's an error, still reset local state
+      dispatch(logout());
+      await persistor.purge();
+      try {
+        await AsyncStorage.removeItem('persist:Root');
+      } catch (e) {
+        console.error('[Auth] Error clearing AsyncStorage on error:', e);
+      }
     }
-
-    // Step 2: Dispatch logout action first (triggers rootReducer to reset state)
-    dispatch(logout());
-    console.log('[Auth] Redux state reset to initial');
-
-    // Step 3: Purge persistor to completely clear persisted state from AsyncStorage
-    await persistor.purge();
-    console.log('[Auth] Persistor purged - AsyncStorage cleared');
-
-    // Step 4: Also manually clear the persist key as backup
-    try {
-      await AsyncStorage.removeItem('persist:Root');
-      console.log('[Auth] AsyncStorage persist key removed');
-    } catch (error) {
-      console.error('[Auth] Error clearing AsyncStorage:', error);
-    }
-
-    console.log('[Auth] Logout completed - user logged out');
   }, [dispatch]);
 
   const loadUser = useCallback(async () => {

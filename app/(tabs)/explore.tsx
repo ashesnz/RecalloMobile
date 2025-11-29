@@ -5,36 +5,31 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/use-auth';
+import { showAlert } from '@/utils/alert';
 
 export default function ProfileScreen() {
   const { user, logout, isLoadingUser } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert(
+    console.log('[ProfileScreen] Logout button clicked');
+
+    showAlert.confirmDestructive(
       'Sign Out',
       'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            // The logout function handles all state management
-            // No need to manage local state since component will unmount
-            await logout();
-          },
-        },
-      ],
-      { cancelable: true }
+      async () => {
+        console.log('[ProfileScreen] Logout confirmed');
+        await logout();
+      },
+      () => {
+        console.log('[ProfileScreen] Logout cancelled');
+      },
+      'Sign Out',
+      'Cancel'
     );
   };
 

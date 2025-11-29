@@ -57,6 +57,36 @@ export const authActions = {
       throw error;
     }
   },
+
+  logout: () => async () => {
+    try {
+      console.log('[AuthActions] Logout started');
+
+      // Call logout API to clear server-side session
+      try {
+        await AuthService.logout();
+        console.log('[AuthActions] Server logout completed');
+      } catch (error) {
+        console.error('[AuthActions] Server logout error (continuing with client logout):', error);
+      }
+
+      // Clear token from secure storage
+      await AuthService.clearToken();
+      console.log('[AuthActions] Token cleared from secure storage');
+
+      console.log('[AuthActions] Logout action completed');
+      return { success: true };
+    } catch (error) {
+      console.error('[AuthActions] Logout error:', error);
+      // Even if there's an error, we should still clear the token
+      try {
+        await AuthService.clearToken();
+      } catch (clearError) {
+        console.error('[AuthActions] Error clearing token:', clearError);
+      }
+      throw error;
+    }
+  },
 };
 
 
