@@ -212,17 +212,17 @@ export const Colors = {
     secondaryLight: lightColors.secondary[100],
 
     background: '#ffffff',
-    backgroundSecondary: lightColors.gray[50],
+    backgroundSecondary: '#f8f9fa',  // Softer light gray instead of gray[50]
     surface: '#ffffff',
-    surfaceSecondary: lightColors.gray[100],
+    surfaceSecondary: '#f1f3f5',  // Softer light gray instead of gray[100]
 
     text: lightColors.gray[900],
-    textSecondary: lightColors.gray[600],
-    textTertiary: lightColors.gray[500],
+    textSecondary: lightColors.gray[700],  // Changed from 600 to 700 for better contrast
+    textTertiary: lightColors.gray[600],   // Changed from 500 to 600 for better contrast
     textInverse: '#ffffff',
 
-    border: lightColors.gray[200],
-    borderLight: lightColors.gray[100],
+    border: '#e9ecef',  // Softer border color
+    borderLight: '#f1f3f5',
     borderDark: lightColors.gray[300],
 
     success: lightColors.success[500],
