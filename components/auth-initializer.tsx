@@ -1,5 +1,5 @@
 import { useEffect, ReactNode } from 'react';
-import { useLoadUser } from '@/stores/auth-store';
+import { useAuth } from '@/hooks/use-auth';
 
 interface AuthInitializerProps {
   children: ReactNode;
@@ -7,10 +7,10 @@ interface AuthInitializerProps {
 
 /**
  * Initializes auth state by loading user from storage on mount
- * Follows the Chatwoot pattern for auth initialization
+ * Following Chatwoot pattern with Redux Toolkit
  */
 export function AuthInitializer({ children }: AuthInitializerProps) {
-  const loadUser = useLoadUser();
+  const { loadUser } = useAuth();
 
   useEffect(() => {
     console.log('[AuthInitializer] Mounted, loading user');
