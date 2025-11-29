@@ -1,6 +1,52 @@
-# Welcome to your Expo app 👋
+# Recallo Mobile 🎤
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Recallo Mobile is a voice-based question answering app built with React Native and Expo. Users answer a series of questions by speaking into their device, swipe through questions, and receive instant grades and feedback.
+
+## Features
+
+- 🗣️ **Voice Recording**: Hold-to-record mic button for answering questions
+- 💬 **Speech Bubble UI**: Questions displayed in elegant speech bubbles
+- 👆 **Swipe Navigation**: Smooth horizontal swiping between questions
+- 📊 **Instant Grading**: Get grades (A-F) for each answer
+- 💡 **Detailed Feedback**: Tap any question to view detailed feedback
+- 🎨 **Dark Mode Support**: Automatic theme switching
+
+## Tech Stack
+
+- React Native
+- Expo Router (file-based routing)
+- TypeScript
+- Expo Haptics for tactile feedback
+- React Native Reanimated for smooth animations
+
+## Project Structure
+
+```
+app/
+  (tabs)/
+    index.tsx          # Main Recallo app screen
+components/
+  speech-bubble.tsx    # Question display component
+  mic-button.tsx       # Voice recording button
+  question-swiper.tsx  # Swipeable question interface
+  results-screen.tsx   # Results and grades display
+  feedback-detail.tsx  # Detailed feedback view
+data/
+  mock-data.ts         # Mock questions and results
+types/
+  question.ts          # TypeScript interfaces
+```
+
+## How It Works
+
+1. **Welcome Screen**: Start a new session
+2. **Question Flow**: 
+   - View question in speech bubble
+   - Hold mic button to record answer
+   - Release to stop recording
+   - Swipe left for next question
+3. **Results**: View all grades at once
+4. **Feedback**: Tap any question for detailed feedback
 
 ## Get started
 
@@ -23,17 +69,14 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Future Enhancements
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- [ ] Actual audio recording with expo-av
+- [ ] Integration with LLM API for real evaluation
+- [ ] Speech-to-text transcription
+- [ ] Question categories and difficulty levels
+- [ ] Progress tracking and history
+- [ ] Custom question sets
 
 ## Learn more
 
@@ -42,9 +85,3 @@ To learn more about developing your project with Expo, look at the following res
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.

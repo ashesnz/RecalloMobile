@@ -1,5 +1,16 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# -------------------------
+# OS / Editor / IDE files
+# -------------------------
+.DS_Store
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
 # dependencies
 node_modules/
 
@@ -30,8 +41,28 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# -------------------------
+# Miscellaneous
+# -------------------------
+.env
+.env.local
+.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+*.log
+*.tmp
+*.bak
+
+
+# -------------------------
+# Mac / System
+# -------------------------
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +72,12 @@ app-example
 # generated native folders
 /ios
 /android
+
+# -------------------------
+# Build tools / cache
+# -------------------------
+dist/
+build/
+.cache/
+.nuget/
+artifacts/
