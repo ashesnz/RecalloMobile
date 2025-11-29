@@ -20,6 +20,7 @@ export default function HomeScreen() {
     setAppState('questions');
   };
 
+
   const handleQuestionsComplete = (completedResponses: QuestionResponse[]) => {
     // Simulate LLM evaluation with mock results
     const mockResults = getMockResults(completedResponses.map(r => r.questionId));

@@ -9,6 +9,7 @@ import {
 import { QuestionResult } from '@/types/question';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { getMockResults, mockQuestions } from '@/data/mock-data';
 
 interface ResultsScreenProps {
   results: QuestionResult[];
@@ -17,12 +18,10 @@ interface ResultsScreenProps {
 }
 
 export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsScreenProps) {
-  const averageScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
-  const overallGrade =
-    averageScore >= 90 ? 'A' :
-    averageScore >= 80 ? 'B' :
-    averageScore >= 70 ? 'C' :
-    averageScore >= 60 ? 'D' : 'F';
+  // Use mock results if no results are provided
+  const displayResults = results.length === 0
+    ? getMockResults(mockQuestions.map(q => q.id))
+    : results;
 
   const getGradeColor = (grade: string) => {
     switch (grade) {
@@ -38,27 +37,13 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Overall Score Card */}
-        <View style={styles.overallCard}>
-          <Text style={styles.title}>Your Results</Text>
-          <View style={styles.overallScoreContainer}>
-            <View style={[styles.gradeCircle, { backgroundColor: getGradeColor(overallGrade) }]}>
-              <Text style={styles.gradeText}>{overallGrade}</Text>
-            </View>
-            <Text style={styles.scoreText}>{Math.round(averageScore)}%</Text>
-          </View>
-          <Text style={styles.subtitle}>
-            {results.length} Questions Answered
-          </Text>
-        </View>
-
         {/* Individual Question Results */}
         <View style={styles.resultsContainer}>
           <Text style={styles.sectionTitle}>
-            Question Breakdown
+            Your Results
           </Text>
 
-          {results.map((result, index) => (
+          {displayResults.map((result, index) => (
             <Pressable
               key={result.questionId}
               style={({ pressed }) => [

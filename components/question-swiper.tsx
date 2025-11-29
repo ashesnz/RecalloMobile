@@ -226,8 +226,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
-    elevation: 3,
-  },
   transcriptLabel: {
     fontSize: 12,
     fontWeight: '600',

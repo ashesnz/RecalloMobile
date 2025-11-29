@@ -16,24 +16,35 @@ export const mockQuestions: Question[] = [
 ];
 
 export const getMockResults = (questionIds: string[]) => {
-  const grades: Array<'A' | 'B' | 'C' | 'D' | 'F'> = ['A', 'B', 'A', 'B', 'C'];
-  const feedbacks = [
-    'Excellent response! You demonstrated clear understanding and provided specific examples.',
-    'Good answer. Consider providing more concrete examples to strengthen your response.',
-    'Great job! Your explanation was thorough and well-structured.',
+  // Specific grades and scores for each question
+  const resultData = [
+    {
+      grade: 'B' as const,
+      score: 73,
+      feedback: 'Good answer! You provided relevant points, but could have elaborated more on specific examples. Your reasoning was clear, though adding more depth would strengthen your response. Consider providing concrete scenarios to illustrate your points better.',
+    },
+    {
+      grade: 'A' as const,
+      score: 80,
+      feedback: 'Excellent response! You demonstrated strong understanding and communicated your ideas effectively. Your answer was well-structured and showed clear thought process. The examples you provided were relevant and helped illustrate your main points perfectly.',
+    },
+    {
+      grade: 'B' as const,
+      score: 65,
+      feedback: 'Solid answer with good foundational knowledge. You covered the main points adequately, but there\'s room for improvement in terms of detail and specificity. Try to provide more concrete examples and explain your reasoning more thoroughly next time.',
+    },
   ];
 
   return questionIds.map((id, index) => {
     const question = mockQuestions.find(q => q.id === id);
-    const grade = grades[index % grades.length];
-    const scoreMap = { A: 95, B: 85, C: 75, D: 65, F: 50 };
+    const data = resultData[index % resultData.length];
 
     return {
       questionId: id,
       question: question?.text || '',
-      grade,
-      score: scoreMap[grade],
-      feedback: feedbacks[index % feedbacks.length],
+      grade: data.grade,
+      score: data.score,
+      feedback: data.feedback,
     };
   });
 };
