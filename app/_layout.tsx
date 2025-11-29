@@ -14,35 +14,34 @@ export const unstable_settings = {
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Show loading screen while checking authentication
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
-
-  // Show login screen if not authenticated
-  if (!isAuthenticated) {
-    return <LoginScreen />;
-  }
-
-  // Show main app if authenticated
   return (
-    <ThemeProvider value={DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <>
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      )}
+
+      {!isLoading && !isAuthenticated && (
+        <LoginScreen />
+      )}
+
+      {!isLoading && isAuthenticated && (
+        <ThemeProvider value={DefaultTheme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      )}
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <RootLayoutNav key="root-nav" />
     </AuthProvider>
   );
 }

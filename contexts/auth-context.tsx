@@ -96,17 +96,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    console.log('[Auth] Logout started');
     try {
+      setState(prev => ({ ...prev, isLoading: true }));
+
       await apiService.logout();
+      console.log('[Auth] API logout completed, token cleared');
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('[Auth] Logout error:', error);
     } finally {
-      setState({
+      const newState = {
         user: null,
         token: null,
         isLoading: false,
         isAuthenticated: false,
-      });
+      };
+      console.log('[Auth] Setting auth state to:', newState);
+      setState(newState);
     }
   };
 

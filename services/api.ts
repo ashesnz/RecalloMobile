@@ -127,7 +127,7 @@ class ApiService {
     try {
       await this.api.post(API_CONFIG.ENDPOINTS.LOGOUT);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout API error:', error);
     } finally {
       await this.clearToken();
     }
