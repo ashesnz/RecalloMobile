@@ -1,13 +1,12 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { API_CONFIG, API_TIMEOUT } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
 
 const TOKEN_KEY = 'auth_token';
 
-// Use SecureStore on native platforms, AsyncStorage on web
+// Use SecureStore on native platforms, localStorage on web
 const isWeb = Platform.OS === 'web';
 
 class ApiService {
@@ -53,7 +52,7 @@ class ApiService {
   async saveToken(token: string): Promise<void> {
     try {
       if (isWeb) {
-        await AsyncStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(TOKEN_KEY, token);
       } else {
         await SecureStore.setItemAsync(TOKEN_KEY, token);
       }
@@ -66,7 +65,7 @@ class ApiService {
   async getToken(): Promise<string | null> {
     try {
       if (isWeb) {
-        return await AsyncStorage.getItem(TOKEN_KEY);
+        return localStorage.getItem(TOKEN_KEY);
       } else {
         return await SecureStore.getItemAsync(TOKEN_KEY);
       }
@@ -79,7 +78,7 @@ class ApiService {
   async clearToken(): Promise<void> {
     try {
       if (isWeb) {
-        await AsyncStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(TOKEN_KEY);
       } else {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
       }

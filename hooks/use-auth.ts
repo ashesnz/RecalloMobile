@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { persistor } from '@/stores/store';
+import { storage } from '@/stores/storage';
 import { authActions } from '@/stores/auth/authActions';
 import { logout, clearAuthError } from '@/stores/auth/authSlice';
 import { AuthService } from '@/stores/auth/authService';
@@ -89,10 +89,10 @@ export function useAuth() {
 
       // Step 4: Also manually clear the persist key as backup
       try {
-        await AsyncStorage.removeItem('persist:Root');
-        console.log('[Auth] AsyncStorage persist key removed');
+        await storage.removeItem('persist:Root');
+        console.log('[Auth] Storage persist key removed');
       } catch (error) {
-        console.error('[Auth] Error clearing AsyncStorage:', error);
+        console.error('[Auth] Error clearing storage:', error);
       }
 
       console.log('[Auth] Logout completed successfully');
@@ -102,9 +102,9 @@ export function useAuth() {
       dispatch(logout());
       await persistor.purge();
       try {
-        await AsyncStorage.removeItem('persist:Root');
+        await storage.removeItem('persist:Root');
       } catch (e) {
-        console.error('[Auth] Error clearing AsyncStorage on error:', e);
+        console.error('[Auth] Error clearing storage on error:', e);
       }
     }
   }, [dispatch]);

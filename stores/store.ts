@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { configureStore, type AnyAction } from '@reduxjs/toolkit';
 import {
   persistStore,
@@ -11,13 +10,14 @@ import {
   REGISTER,
 } from 'redux-persist';
 import authReducer from './auth/authSlice';
+import { storage } from './storage';
 
 const CURRENT_VERSION = 1;
 
 const persistConfig = {
   key: 'Root',
   version: CURRENT_VERSION,
-  storage: AsyncStorage,
+  storage: storage,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   migrate: async (state: any) => {
     // If the stored version is older or doesn't exist, return initial state
