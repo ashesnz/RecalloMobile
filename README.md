@@ -24,17 +24,25 @@ Recallo Mobile is a voice-based question answering app built with React Native a
 ```
 app/
   (tabs)/
-    index.tsx          # Main Recallo app screen
+    index.tsx          # Main Recallo app screen with dashboard
 components/
+  login-screen.tsx     # Login and registration UI
+  auth-initializer.tsx # Authentication state initialization
+  daily-questions-widget.tsx  # Dashboard widget for daily questions
   speech-bubble.tsx    # Question display component
   mic-button.tsx       # Voice recording button
   question-swiper.tsx  # Swipeable question interface
   results-screen.tsx   # Results and grades display
   feedback-detail.tsx  # Detailed feedback view
+stores/
+  auth-store.ts        # Authentication state management
+hooks/
+  use-auth.ts          # Authentication hook
 data/
   mock-data.ts         # Mock questions and results
 types/
   question.ts          # TypeScript interfaces
+  auth.ts              # Authentication types
 ```
 
 ## How It Works

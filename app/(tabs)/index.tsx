@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/components/results-screen';
 import { FeedbackDetail } from '@/components/feedback-detail';
+import { DailyQuestionsWidget } from '@/components/daily-questions-widget';
 import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
 import { Colors } from '@/constants/colors';
-import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/hooks/use-auth';
 
-type AppState = 'welcome' | 'questions' | 'results' | 'feedback';
+type AppState = 'dashboard' | 'questions' | 'results' | 'feedback';
 
 export default function HomeScreen() {
-  const [appState, setAppState] = useState<AppState>('welcome');
+  const [appState, setAppState] = useState<AppState>('dashboard');
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
+  const { user } = useAuth();
 
   const handleStartSession = () => {
     setResults([]);
@@ -40,52 +42,21 @@ export default function HomeScreen() {
   };
 
   const handleRestart = () => {
-    setAppState('welcome');
+    setAppState('dashboard');
   };
 
-  // Welcome Screen
-  if (appState === 'welcome') {
+  // Dashboard Screen
+  if (appState === 'dashboard') {
     return (
-      <View style={styles.container}>
-
-        <View style={styles.welcomeContainer}>
-          <Ionicons name="mic-circle" size={120} color={Colors.primary} />
-          <Text style={styles.welcomeTitle}>
-            Welcome to Recallo
-          </Text>
-          <Text style={styles.welcomeSubtitle}>
-            Answer questions by voice and get instant feedback
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.dashboardContainer}>
+          <Text style={styles.welcomeBack}>
+            Welcome back, {user?.name || 'Guest'}!
           </Text>
 
-          <View style={styles.featuresContainer}>
-            <View style={styles.featureItem}>
-              <Ionicons name="chatbubbles" size={32} color={Colors.primary} />
-              <Text style={styles.featureText}>
-                {mockQuestions.length} Questions
-              </Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="mic" size={32} color={Colors.primary} />
-              <Text style={styles.featureText}>Voice Answers</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <Ionicons name="analytics" size={32} color={Colors.primary} />
-              <Text style={styles.featureText}>Instant Grades</Text>
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.startButton,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-            onPress={handleStartSession}
-          >
-            <Text style={styles.startButtonText}>Start Session</Text>
-            <Ionicons name="arrow-forward" size={24} color={Colors.white} />
-          </Pressable>
+          <DailyQuestionsWidget onPress={handleStartSession} />
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -126,53 +97,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  welcomeContainer: {
+  scrollContent: {
+    flexGrow: 1,
+  },
+  dashboardContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    gap: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
-  welcomeTitle: {
-    fontSize: 32,
+  welcomeBack: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: Colors.text,
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  welcomeSubtitle: {
-    fontSize: 18,
-    color: Colors.textLight,
-    textAlign: 'center',
-    maxWidth: 300,
-  },
-  featuresContainer: {
-    flexDirection: 'row',
-    gap: 30,
-    marginVertical: 30,
-  },
-  featureItem: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  featureText: {
-    fontSize: 14,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    backgroundColor: Colors.buttonPrimary,
-    marginTop: 20,
-  },
-  startButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.buttonText,
+    marginBottom: 30,
+    paddingHorizontal: 20,
   },
 });
