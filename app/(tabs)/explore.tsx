@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function ProfileScreen() {
   const { user, logout, isLoading } = useAuth();

@@ -1,45 +1,67 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { create } from 'zustand';
 import { apiService } from '@/services/api';
-import { LoginCredentials, RegisterCredentials, AuthState } from '@/types/auth';
+import { LoginCredentials, RegisterCredentials, User } from '@/types/auth';
 
-interface AuthContextType extends AuthState {
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
+
+interface AuthActions {
   login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
   register: (credentials: RegisterCredentials) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
+  setLoading: (isLoading: boolean) => void;
+  reset: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+type AuthStore = AuthState & AuthActions;
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    token: null,
-    isLoading: true,
-    isAuthenticated: false,
-  });
+const initialState: AuthState = {
+  user: null,
+  token: null,
+  isLoading: true,
+  isAuthenticated: false,
+};
 
-  const loadUser = async () => {
+export const useAuthStore = create<AuthStore>((set, get) => ({
+  ...initialState,
+
+  setLoading: (isLoading: boolean) => {
+    console.log('[AuthStore] Setting isLoading:', isLoading);
+    set({ isLoading });
+  },
+
+  reset: () => {
+    console.log('[AuthStore] Resetting auth state');
+    set(initialState);
+  },
+
+  loadUser: async () => {
     try {
-      console.log('[Auth] loadUser called');
-      setState(prev => ({ ...prev, isLoading: true }));
+      console.log('[AuthStore] loadUser called');
+      set({ isLoading: true });
 
       const token = await apiService.getToken();
-      console.log('[Auth] Token from storage:', token ? 'exists' : 'null');
+      console.log('[AuthStore] Token from storage:', token ? 'exists' : 'null');
 
       if (token) {
-        console.log('[Auth] Token exists, fetching user profile');
+        console.log('[AuthStore] Token exists, fetching user profile');
         const user = await apiService.getUserProfile();
-        setState({
+
+        set({
           user,
           token,
           isLoading: false,
           isAuthenticated: true,
         });
-        console.log('[Auth] User loaded successfully:', user.email);
+        console.log('[AuthStore] User loaded successfully:', user.email);
       } else {
-        console.log('[Auth] No token found, setting unauthenticated state');
-        setState({
+        console.log('[AuthStore] No token found, setting unauthenticated state');
+        set({
           user: null,
           token: null,
           isLoading: false,
@@ -47,44 +69,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
-      console.error('[Auth] Load user error:', error);
+      console.error('[AuthStore] Load user error:', error);
       // Clear invalid token
       await apiService.clearToken();
-      setState({
+      set({
         user: null,
         token: null,
         isLoading: false,
         isAuthenticated: false,
       });
     }
-  };
+  },
 
-  // Load user on mount only
-  useEffect(() => {
-    console.log('[Auth] AuthProvider mounted, loading user');
-    loadUser();
-  }, []);
-
-  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
+  login: async (credentials: LoginCredentials): Promise<{ success: boolean; error?: string }> => {
     try {
-      console.log('[Auth] Login started');
-      setState(prev => ({ ...prev, isLoading: true }));
+      console.log('[AuthStore] Login started');
+      set({ isLoading: true });
 
       const response = await apiService.login(credentials);
-      console.log('[Auth] Login API successful');
+      console.log('[AuthStore] Login API successful');
 
-      setState({
+      set({
         user: response.user,
         token: response.token,
         isLoading: false,
         isAuthenticated: true,
       });
-      console.log('[Auth] State updated - authenticated');
+      console.log('[AuthStore] State updated - authenticated');
       return { success: true };
     } catch (error: any) {
-      console.log('[Auth] Login failed:', error);
-      setState(prev => ({ ...prev, isLoading: false }));
-      console.log('[Auth] State updated - not authenticated');
+      console.log('[AuthStore] Login failed:', error);
+      set({ isLoading: false });
+      console.log('[AuthStore] State updated - not authenticated');
 
       // Return error message instead of throwing
       const errorMessage = error.message || 'Login failed';
@@ -103,15 +119,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { success: false, error: displayMessage };
     }
-  };
+  },
 
-  const register = async (credentials: RegisterCredentials): Promise<{ success: boolean; error?: string }> => {
+  register: async (credentials: RegisterCredentials): Promise<{ success: boolean; error?: string }> => {
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      console.log('[AuthStore] Register started');
+      set({ isLoading: true });
 
       const response = await apiService.register(credentials);
+      console.log('[AuthStore] Register API successful');
 
-      setState({
+      set({
         user: response.user,
         token: response.token,
         isLoading: false,
@@ -119,7 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return { success: true };
     } catch (error: any) {
-      setState(prev => ({ ...prev, isLoading: false }));
+      console.log('[AuthStore] Register failed:', error);
+      set({ isLoading: false });
 
       // Return error message instead of throwing
       const errorMessage = error.message || 'Registration failed';
@@ -138,61 +157,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { success: false, error: displayMessage };
     }
-  };
+  },
 
-  const logout = async () => {
-    console.log('[Auth] Logout started');
-    console.log('[Auth] Current state before logout:', { isAuthenticated: state.isAuthenticated, user: state.user?.email });
+  logout: async () => {
+    const state = get();
+    console.log('[AuthStore] Logout started');
+    console.log('[AuthStore] Current state:', {
+      isAuthenticated: state.isAuthenticated,
+      user: state.user?.email
+    });
 
     // Set loading state immediately
-    setState(prev => {
-      console.log('[Auth] Setting isLoading to true');
-      return { ...prev, isLoading: true };
-    });
+    set({ isLoading: true });
+    console.log('[AuthStore] isLoading set to true');
 
     // Call logout API (which will clear token in its finally block)
     try {
       await apiService.logout();
-      console.log('[Auth] Logout API completed successfully');
+      console.log('[AuthStore] Logout API completed successfully');
     } catch (error) {
-      console.error('[Auth] Logout API error (non-critical):', error);
+      console.error('[AuthStore] Logout API error (non-critical):', error);
       // Ensure token is cleared even if API call fails
       await apiService.clearToken();
     }
 
-    // Always clear the auth state - this is what triggers the UI to show login screen
-    console.log('[Auth] Clearing authentication state');
-    setState({
+    // Clear the auth state - this triggers UI to show login screen
+    console.log('[AuthStore] Clearing authentication state');
+    set({
       user: null,
       token: null,
       isLoading: false,
       isAuthenticated: false,
     });
-    console.log('[Auth] Logout completed - state set to unauthenticated');
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        ...state,
-        login,
-        register,
-        logout,
-        loadUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-
-  return context;
-}
+    console.log('[AuthStore] Logout completed - state set to unauthenticated');
+  },
+}));
 

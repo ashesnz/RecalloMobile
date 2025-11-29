@@ -3,7 +3,8 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
-import { AuthProvider, useAuth } from '@/contexts/auth-context';
+import { AuthInitializer } from '@/components/auth-initializer';
+import { useAuth } from '@/hooks/use-auth';
 import { LoginScreen } from '@/components/login-screen';
 import { Colors } from '@/constants/colors';
 
@@ -42,9 +43,9 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
+    <AuthInitializer>
       <RootLayoutNav />
-    </AuthProvider>
+    </AuthInitializer>
   );
 }
 
