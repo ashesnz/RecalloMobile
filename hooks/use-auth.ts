@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
+import { persistor } from '@/stores/store';
 import { authActions } from '@/stores/auth/authActions';
 import { logout, clearAuthError } from '@/stores/auth/authSlice';
 import { AuthService } from '@/stores/auth/authService';
@@ -72,18 +74,33 @@ export function useAuth() {
   const handleLogout = useCallback(async () => {
     console.log('[Auth] Logout started');
 
-    // Call logout API to clear server-side session
+    // Step 1: Call logout API to clear server-side session
     try {
       await AuthService.logout();
       console.log('[Auth] Logout API completed');
     } catch (error) {
       console.error('[Auth] Logout API error (non-critical):', error);
+      // Ensure token is cleared even if API call fails
       await AuthService.clearToken();
     }
 
-    // Dispatch logout action which will clear Redux state via rootReducer
+    // Step 2: Dispatch logout action first (triggers rootReducer to reset state)
     dispatch(logout());
-    console.log('[Auth] Logout completed - state cleared');
+    console.log('[Auth] Redux state reset to initial');
+
+    // Step 3: Purge persistor to completely clear persisted state from AsyncStorage
+    await persistor.purge();
+    console.log('[Auth] Persistor purged - AsyncStorage cleared');
+
+    // Step 4: Also manually clear the persist key as backup
+    try {
+      await AsyncStorage.removeItem('persist:Root');
+      console.log('[Auth] AsyncStorage persist key removed');
+    } catch (error) {
+      console.error('[Auth] Error clearing AsyncStorage:', error);
+    }
+
+    console.log('[Auth] Logout completed - user logged out');
   }, [dispatch]);
 
   const loadUser = useCallback(async () => {
