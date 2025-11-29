@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/use-auth';
  * - Uses specific loading state (isLoggingIn) instead of generic isLoading
  * - Handles errors through auth store
  * - Clears auth errors on unmount
+ * - Preserves email on failed login (only clears password)
  */
 export function LoginScreen() {
   const { login, isLoggingIn, error: authError, clearError } = useAuth();
@@ -76,6 +77,8 @@ export function LoginScreen() {
       // Navigation handled by auth state change
     } else {
       console.log('Login failed:', result.error);
+      // Clear only the password field on failed login, keep email
+      setPassword('');
       // Error is already in auth store, will be displayed
     }
   };

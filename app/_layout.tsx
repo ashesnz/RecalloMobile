@@ -7,8 +7,8 @@ import { PersistGate } from 'redux-persist/integration/react';
 import 'react-native-reanimated';
 import { AuthInitializer } from '@/components/auth-initializer';
 import { useAuth } from '@/hooks/use-auth';
-import { LoginScreen } from '@/components/login-screen';
-import { Colors } from '@/constants/colors';
+import { LoginScreen } from '@/app/screens/auth';
+import { Colors } from '@/constants/theme';
 import { store, persistor } from '@/stores/store';
 
 export const unstable_settings = {
@@ -24,7 +24,7 @@ function RootLayoutNav() {
     <>
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.light.primary} />
         </View>
       )}
 
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background,
   },
 });
 

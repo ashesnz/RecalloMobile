@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
-import { ResultsScreen } from '@/components/results-screen';
+import { ResultsScreen } from '@/app/screens/results';
 import { FeedbackDetail } from '@/components/feedback-detail';
 import { DailyQuestionsWidget } from '@/components/daily-questions-widget';
 import { QuestionSettingsWidget } from '@/components/question-settings-widget';
@@ -9,7 +9,7 @@ import { QuestionSettingsForm } from '@/components/question-settings-form';
 import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
 import { QuestionSettings } from '@/types/project';
-import { Colors } from '@/constants/colors';
+import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { getPersonalizedGreeting } from '@/utils/greeting';
 import { settingsStorage } from '@/services/settings-storage';
@@ -166,7 +166,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   welcomeBack: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: Colors.light.text,
     marginBottom: 30,
     paddingHorizontal: 20,
   },
