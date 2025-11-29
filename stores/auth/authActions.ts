@@ -20,9 +20,25 @@ import type { AppDispatch } from '../store';
 export const authActions = {
   login: (credentials: LoginPayload) => async (dispatch: AppDispatch) => {
     try {
+      console.log('[AuthActions] Login started');
       dispatch(loginPending());
       const response = await AuthService.login(credentials);
+      console.log('[AuthActions] Login response from service:', JSON.stringify(response, null, 2));
+      console.log('[AuthActions] AccessToken from response:', response.accessToken ? 'exists' : 'missing');
       dispatch(loginFulfilled(response));
+      console.log('[AuthActions] loginFulfilled dispatched');
+
+      // Automatically fetch user profile after login
+      console.log('[AuthActions] Fetching user profile...');
+      try {
+        const profileResponse = await AuthService.getProfile();
+        console.log('[AuthActions] User profile fetched:', profileResponse.user);
+        dispatch(getProfileFulfilled(profileResponse));
+      } catch (profileError) {
+        console.error('[AuthActions] Failed to fetch user profile:', profileError);
+        dispatch(getProfileRejected());
+      }
+
       return { success: true, data: response };
     } catch (error) {
       const apiError = handleApiError(error, 'Login failed');
@@ -34,9 +50,23 @@ export const authActions = {
 
   register: (credentials: RegisterPayload) => async (dispatch: AppDispatch) => {
     try {
+      console.log('[AuthActions] Register started');
       dispatch(registerPending());
       const response = await AuthService.register(credentials);
       dispatch(registerFulfilled(response));
+      console.log('[AuthActions] registerFulfilled dispatched');
+
+      // Automatically fetch user profile after registration
+      console.log('[AuthActions] Fetching user profile...');
+      try {
+        const profileResponse = await AuthService.getProfile();
+        console.log('[AuthActions] User profile fetched:', profileResponse.user);
+        dispatch(getProfileFulfilled(profileResponse));
+      } catch (profileError) {
+        console.error('[AuthActions] Failed to fetch user profile:', profileError);
+        dispatch(getProfileRejected());
+      }
+
       return { success: true, data: response };
     } catch (error) {
       const apiError = handleApiError(error, 'Registration failed');

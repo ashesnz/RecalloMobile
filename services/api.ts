@@ -91,13 +91,18 @@ class ApiService {
   // Auth endpoints
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
+      console.log('[API] Login request:', { email: credentials.email });
       const response = await this.api.post<AuthResponse>(
         API_CONFIG.ENDPOINTS.LOGIN,
         credentials
       );
 
-      if (response.data.token) {
-        await this.saveToken(response.data.token);
+      console.log('[API] Login response:', JSON.stringify(response.data, null, 2));
+      console.log('[API] AccessToken:', response.data.accessToken ? 'exists' : 'missing');
+
+      if (response.data.accessToken) {
+        await this.saveToken(response.data.accessToken);
+        console.log('[API] Token saved to secure storage');
       }
 
       return response.data;
@@ -114,8 +119,8 @@ class ApiService {
         credentials
       );
 
-      if (response.data.token) {
-        await this.saveToken(response.data.token);
+      if (response.data.accessToken) {
+        await this.saveToken(response.data.accessToken);
       }
 
       return response.data;

@@ -43,10 +43,14 @@ export const authSlice = createSlice({
       state.error = null;
     },
     loginFulfilled: (state, action: PayloadAction<LoginResponse>) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
+      console.log('[AuthSlice] loginFulfilled payload:', JSON.stringify(action.payload, null, 2));
+      console.log('[AuthSlice] AccessToken from payload:', action.payload.accessToken ? 'exists' : 'missing');
+      // Store the access token
+      state.token = action.payload.accessToken;
+      console.log('[AuthSlice] State after update - token:', state.token ? 'exists' : 'missing');
       state.uiFlags.isLoggingIn = false;
       state.error = null;
+      // Note: user will be loaded separately via getProfile action
     },
     loginRejected: (state, action: PayloadAction<string | undefined>) => {
       state.uiFlags.isLoggingIn = false;
@@ -57,10 +61,10 @@ export const authSlice = createSlice({
       state.error = null;
     },
     registerFulfilled: (state, action: PayloadAction<RegisterResponse>) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
+      state.token = action.payload.accessToken;
       state.uiFlags.isRegistering = false;
       state.error = null;
+      // Note: user will be loaded separately via getProfile action
     },
     registerRejected: (state, action: PayloadAction<string | undefined>) => {
       state.uiFlags.isRegistering = false;

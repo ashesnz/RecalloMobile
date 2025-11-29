@@ -8,6 +8,7 @@ import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/use-auth';
+import { getPersonalizedGreeting } from '@/utils/greeting';
 
 type AppState = 'dashboard' | 'questions' | 'results' | 'feedback';
 
@@ -51,7 +52,7 @@ export default function HomeScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <View style={styles.dashboardContainer}>
           <Text style={styles.welcomeBack}>
-            Welcome back, {user?.name || 'Guest'}!
+            {getPersonalizedGreeting(user?.name)}!
           </Text>
 
           <DailyQuestionsWidget onPress={handleStartSession} />
