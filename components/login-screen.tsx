@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/colors';
 import { useAuth } from '@/hooks/use-auth';
 
+/**
+ * Login Screen following Chatwoot pattern
+ * - Uses specific loading state (isLoggingIn) instead of generic isLoading
+ * - Handles errors through auth store
+ * - Clears auth errors on unmount
+ */
 export function LoginScreen() {
-  const { login, isLoading } = useAuth();
+  const { login, isLoggingIn, error: authError, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  // Clear auth error when component unmounts
+  useEffect(() => {
+    return () => {
+      clearError();
+    };
+  }, [clearError]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,6 +59,7 @@ export function LoginScreen() {
   const handleSubmit = async () => {
     // Clear previous errors
     setErrors({});
+    clearError();
 
     if (!validateForm()) {
       return;
@@ -56,11 +70,10 @@ export function LoginScreen() {
 
     if (result.success) {
       console.log('Login successful');
+      // Navigation handled by auth state change
     } else {
       console.log('Login failed:', result.error);
-      setErrors({
-        general: result.error || 'Unable to sign in. Please try again.',
-      });
+      // Error is already in auth store, will be displayed
     }
   };
 
@@ -82,11 +95,11 @@ export function LoginScreen() {
 
         {/* Form */}
         <View style={styles.form}>
-          {/* General Error Message */}
-          {errors.general && (
+          {/* Auth Error Banner */}
+          {authError && (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle" size={20} color={Colors.gradeF} />
-              <Text style={styles.errorBannerText}>{errors.general}</Text>
+              <Text style={styles.errorBannerText}>{authError}</Text>
             </View>
           )}
 
@@ -102,12 +115,14 @@ export function LoginScreen() {
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
-                  setErrors({ ...errors, email: undefined, general: undefined });
+                  if (errors.email) {
+                    setErrors({ ...errors, email: undefined });
+                  }
                 }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
-                editable={!isLoading}
+                editable={!isLoggingIn}
               />
             </View>
             {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
@@ -125,14 +140,16 @@ export function LoginScreen() {
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
-                  setErrors({ ...errors, password: undefined, general: undefined });
+                  if (errors.password) {
+                    setErrors({ ...errors, password: undefined });
+                  }
                 }}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoComplete="password"
-                editable={!isLoading}
+                editable={!isLoggingIn}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)}>
+              <Pressable onPress={() => setShowPassword(!showPassword)} disabled={isLoggingIn}>
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
@@ -147,12 +164,12 @@ export function LoginScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.submitButton,
-              { opacity: pressed || isLoading ? 0.7 : 1 },
+              { opacity: pressed || isLoggingIn ? 0.7 : 1 },
             ]}
             onPress={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoggingIn}
           >
-            {isLoading ? (
+            {isLoggingIn ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
               <>

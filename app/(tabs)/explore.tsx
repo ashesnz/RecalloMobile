@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function ProfileScreen() {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoadingUser } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -121,12 +121,12 @@ export default function ProfileScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.signOutButton,
-            { opacity: pressed || isLoading ? 0.7 : 1 },
+            { opacity: pressed || isLoadingUser ? 0.7 : 1 },
           ]}
           onPress={handleLogout}
-          disabled={isLoading}
+          disabled={isLoadingUser}
         >
-          {isLoading ? (
+          {isLoadingUser ? (
             <ActivityIndicator color={Colors.gradeF} size="small" />
           ) : (
             <>

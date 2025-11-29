@@ -81,3 +81,5 @@ build/
 .cache/
 .nuget/
 artifacts/
+
+chatwoot-mobile-app
