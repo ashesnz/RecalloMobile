@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/components/results-screen';
 import { FeedbackDetail } from '@/components/feedback-detail';
@@ -7,12 +7,10 @@ import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/contexts/auth-context';
 
 type AppState = 'welcome' | 'questions' | 'results' | 'feedback';
 
 export default function HomeScreen() {
-  const { user, logout } = useAuth();
   const [appState, setAppState] = useState<AppState>('welcome');
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
@@ -22,22 +20,6 @@ export default function HomeScreen() {
     setAppState('questions');
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-          },
-        },
-      ]
-    );
-  };
 
 
   const handleQuestionsComplete = (completedResponses: QuestionResponse[]) => {
@@ -65,25 +47,6 @@ export default function HomeScreen() {
   if (appState === 'welcome') {
     return (
       <View style={styles.container}>
-        {/* User Info & Logout */}
-        <View style={styles.headerBar}>
-          <View style={styles.userInfo}>
-            <Ionicons name="person-circle" size={32} color={Colors.primary} />
-            <View>
-              <Text style={styles.userName}>{user?.name || 'User'}</Text>
-              <Text style={styles.userEmail}>{user?.email || ''}</Text>
-            </View>
-          </View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.logoutButton,
-              { opacity: pressed ? 0.7 : 1 },
-            ]}
-            onPress={handleLogout}
-          >
-            <Ionicons name="log-out-outline" size={24} color={Colors.gradeF} />
-          </Pressable>
-        </View>
 
         <View style={styles.welcomeContainer}>
           <Ionicons name="mic-circle" size={120} color={Colors.primary} />
@@ -162,34 +125,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.textLight + '20',
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  userEmail: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  logoutButton: {
-    padding: 8,
   },
   welcomeContainer: {
     flex: 1,

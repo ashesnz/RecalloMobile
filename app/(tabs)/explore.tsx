@@ -1,114 +1,152 @@
-import React from 'react';
-import { StyleSheet, ScrollView, View, Text } from 'react-native';
+import React, { useState } from 'react';
+import {
+  StyleSheet,
+  ScrollView,
+  View,
+  Text,
+  Pressable,
+  Alert,
+  ActivityIndicator
+} from 'react-native';
 import { Colors } from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '@/contexts/auth-context';
 
-export default function ExploreScreen() {
-  const features = [
-    {
-      icon: 'mic-circle' as const,
-      title: 'Voice Recording',
-      description: 'Hold the mic button to record your answers naturally',
-    },
-    {
-      icon: 'swap-horizontal' as const,
-      title: 'Swipe Navigation',
-      description: 'Easily navigate between questions with smooth swipes',
-    },
-    {
-      icon: 'ribbon' as const,
-      title: 'Instant Grading',
-      description: 'Get immediate feedback and grades on your responses',
-    },
-    {
-      icon: 'chatbubbles' as const,
-      title: 'Detailed Feedback',
-      description: 'Tap any result to view comprehensive feedback',
-    },
-  ];
+export default function ProfileScreen() {
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoggingOut(true);
+              await logout();
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
+            } finally {
+              setIsLoggingOut(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Ionicons name="information-circle" size={60} color={Colors.primary} />
-          <Text style={styles.title}>About Recallo</Text>
-          <Text style={styles.subtitle}>
-            Voice-based learning and assessment
-          </Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.avatarContainer}>
+            <Ionicons name="person-circle" size={100} color={Colors.primary} />
+          </View>
+          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userEmail}>{user?.email || ''}</Text>
         </View>
 
+        {/* Account Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Features</Text>
-          {features.map((feature, index) => (
-            <View
-              key={index}
-              style={styles.featureCard}
-            >
-              <View style={styles.featureHeader}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name={feature.icon} size={24} color={Colors.white} />
-                </View>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-              </View>
-              <Text style={styles.featureDescription}>
-                {feature.description}
-              </Text>
-            </View>
-          ))}
-        </View>
+          <Text style={styles.sectionTitle}>Account</Text>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How It Works</Text>
-          <View style={styles.stepCard}>
-            <View style={styles.step}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>1</Text>
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <View style={styles.infoLabel}>
+                <Ionicons name="mail-outline" size={20} color={Colors.textLight} />
+                <Text style={styles.infoLabelText}>Email</Text>
               </View>
-              <Text style={styles.stepText}>
-                Start a new session from the Recallo tab
-              </Text>
+              <Text style={styles.infoValue}>{user?.email || 'N/A'}</Text>
             </View>
-            <View style={styles.step}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>2</Text>
+
+            <View style={styles.divider} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoLabel}>
+                <Ionicons name="person-outline" size={20} color={Colors.textLight} />
+                <Text style={styles.infoLabelText}>Name</Text>
               </View>
-              <Text style={styles.stepText}>
-                Read each question in the speech bubble
-              </Text>
+              <Text style={styles.infoValue}>{user?.name || 'N/A'}</Text>
             </View>
-            <View style={styles.step}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>3</Text>
+
+            <View style={styles.divider} />
+
+            <View style={styles.infoRow}>
+              <View style={styles.infoLabel}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={Colors.textLight} />
+                <Text style={styles.infoLabelText}>User ID</Text>
               </View>
-              <Text style={styles.stepText}>
-                Hold the mic button and speak your answer
-              </Text>
-            </View>
-            <View style={styles.step}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepText}>4</Text>
-              </View>
-              <Text style={styles.stepText}>
-                Swipe left to move to the next question
-              </Text>
-            </View>
-            <View style={styles.step}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>5</Text>
-              </View>
-              <Text style={styles.stepText}>
-                Review your results and tap for detailed feedback
+              <Text style={styles.infoValue} numberOfLines={1}>
+                {user?.id || 'N/A'}
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Built with React Native + Expo
-          </Text>
+        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+
+          <View style={styles.card}>
+            <View style={styles.aboutRow}>
+              <Ionicons name="information-circle-outline" size={20} color={Colors.textLight} />
+              <View style={styles.aboutContent}>
+                <Text style={styles.aboutTitle}>Recallo</Text>
+                <Text style={styles.aboutText}>
+                  Voice-based learning and assessment platform
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.aboutRow}>
+              <Ionicons name="code-outline" size={20} color={Colors.textLight} />
+              <View style={styles.aboutContent}>
+                <Text style={styles.aboutTitle}>Version</Text>
+                <Text style={styles.aboutText}>1.0.0</Text>
+              </View>
+            </View>
+          </View>
         </View>
+
+        {/* Sign Out Button */}
+        <Pressable
+          style={({ pressed }) => [
+            styles.signOutButton,
+            { opacity: pressed || isLoggingOut ? 0.7 : 1 },
+          ]}
+          onPress={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <ActivityIndicator color={Colors.gradeF} size="small" />
+          ) : (
+            <>
+              <Ionicons name="log-out-outline" size={24} color={Colors.gradeF} />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </>
+          )}
+        </Pressable>
+
+        {/* Footer */}
+        <Text style={styles.footer}>
+          © 2024 Recallo. All rights reserved.
+        </Text>
       </ScrollView>
     </View>
   );
@@ -120,102 +158,130 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    padding: 20,
+    paddingTop: 60,
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
-  header: {
+  profileHeader: {
     alignItems: 'center',
-    marginBottom: 30,
-    gap: 10,
+    marginBottom: 40,
   },
-  title: {
-    fontSize: 32,
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  userName: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
-    textAlign: 'center',
+    marginBottom: 4,
   },
-  subtitle: {
+  userEmail: {
     fontSize: 16,
     color: Colors.textLight,
-    textAlign: 'center',
   },
   section: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 15,
-  },
-  featureCard: {
-    padding: 16,
-    borderRadius: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: 12,
-    gap: 10,
-    backgroundColor: Colors.cardBackground,
+    marginLeft: 4,
   },
-  featureHeader: {
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: Colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  infoLabel: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
+  infoLabelText: {
+    fontSize: 16,
+    color: Colors.text,
+    fontWeight: '500',
   },
-  featureTitle: {
-    fontSize: 18,
+  infoValue: {
+    fontSize: 16,
+    color: Colors.textLight,
+    flex: 1,
+    textAlign: 'right',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.textLight + '20',
+  },
+  aboutRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  aboutContent: {
+    flex: 1,
+  },
+  aboutTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.text,
+    marginBottom: 4,
   },
-  featureDescription: {
+  aboutText: {
     fontSize: 14,
     color: Colors.textLight,
     lineHeight: 20,
-    marginLeft: 52,
   },
-  stepCard: {
-    padding: 20,
-    borderRadius: 12,
-    gap: 16,
-    backgroundColor: Colors.cardBackground,
-  },
-  step: {
+  signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
+    gap: 12,
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+    borderColor: Colors.gradeF,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 24,
+    shadowColor: Colors.gradeF,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  stepNumberText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  stepText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    color: Colors.text,
+  signOutText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.gradeF,
   },
   footer: {
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-  footerText: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.textLight,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 
