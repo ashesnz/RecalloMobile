@@ -124,12 +124,18 @@ class ApiService {
   }
 
   async logout(): Promise<void> {
+    console.log('[API] Logout started');
     try {
+      console.log('[API] Calling logout endpoint');
       await this.api.post(API_CONFIG.ENDPOINTS.LOGOUT);
+      console.log('[API] Logout endpoint responded successfully');
     } catch (error) {
-      console.error('Logout API error:', error);
+      console.error('[API] Logout API error:', error);
+      // Continue to clear token even if API call fails
     } finally {
+      console.log('[API] Clearing token from storage');
       await this.clearToken();
+      console.log('[API] Token cleared from storage');
     }
   }
 
@@ -150,8 +156,13 @@ class ApiService {
 
       if (axiosError.response) {
         // Server responded with error
+        const status = axiosError.response.status;
         const message = axiosError.response.data?.message || 'An error occurred';
-        return new Error(message);
+        const errorWithStatus = new Error(message);
+        // Attach status code to error object for better handling
+        (errorWithStatus as any).status = status;
+        (errorWithStatus as any).statusText = axiosError.response.statusText;
+        return errorWithStatus;
       } else if (axiosError.request) {
         // Request made but no response
         return new Error('Unable to connect to server. Please check your connection.');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -13,8 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, logout, isLoading } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -29,15 +28,9 @@ export default function ProfileScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            try {
-              setIsLoggingOut(true);
-              await logout();
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            } finally {
-              setIsLoggingOut(false);
-            }
+            // The logout function handles all state management
+            // No need to manage local state since component will unmount
+            await logout();
           },
         },
       ],
@@ -128,12 +121,12 @@ export default function ProfileScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.signOutButton,
-            { opacity: pressed || isLoggingOut ? 0.7 : 1 },
+            { opacity: pressed || isLoading ? 0.7 : 1 },
           ]}
           onPress={handleLogout}
-          disabled={isLoggingOut}
+          disabled={isLoading}
         >
-          {isLoggingOut ? (
+          {isLoading ? (
             <ActivityIndicator color={Colors.gradeF} size="small" />
           ) : (
             <>

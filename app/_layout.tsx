@@ -14,6 +14,8 @@ export const unstable_settings = {
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log('[RootLayoutNav] Rendering - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+
   return (
     <>
       {isLoading && (
@@ -41,7 +43,7 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav key="root-nav" />
+      <RootLayoutNav />
     </AuthProvider>
   );
 }

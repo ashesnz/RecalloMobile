@@ -51,21 +51,15 @@ export function LoginScreen() {
       return;
     }
 
-    try {
-      await login({ email: email.trim(), password });
-    } catch (error: any) {
-      // Clear password but keep email
-      setPassword('');
+    console.log('Attempting login with email:', email.trim());
+    const result = await login({ email: email.trim(), password });
 
-      // Show user-friendly error message
-      const errorMessage = error.message || 'Unable to sign in';
-
+    if (result.success) {
+      console.log('Login successful');
+    } else {
+      console.log('Login failed:', result.error);
       setErrors({
-        general: errorMessage.includes('400') || errorMessage.includes('401')
-          ? 'The email or password is incorrect. Please try again.'
-          : errorMessage.includes('connect') || errorMessage.includes('network')
-          ? 'Unable to connect to server. Please check your connection.'
-          : errorMessage,
+        general: result.error || 'Unable to sign in. Please try again.',
       });
     }
   };
