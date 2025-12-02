@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { SettingsIcon, FolderIcon, TimeIcon } from '@/components/ui/icon';
+import { SettingsIcon, FolderIcon, TimeIcon, LockIcon } from '@/components/ui/icon';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 import { apiService } from '@/services/api';
 import type { UpdateUserDto, User } from '@/types/auth';
@@ -29,6 +29,7 @@ export function QuestionSettingsWidget({
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [openAiKeySet, setOpenAiKeySet] = useState<boolean | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [tempTime, setTempTime] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -66,6 +67,26 @@ export function QuestionSettingsWidget({
           }
         }
         if (saved?.scheduledTime) setTempTime(new Date(saved.scheduledTime));
+
+        // Determine whether the user's OpenAI API key is set on the server.
+        // Prefer the current user from the store, but fall back to fetching the profile if needed.
+        try {
+          if (currentUser) {
+            setOpenAiKeySet(!!currentUser.openAiKey);
+          } else {
+            // fetch profile directly as a one-off to determine key state
+            const profile = await apiService.getUserProfile();
+            if (profile) {
+              dispatch(getProfileFulfilled({ user: profile }));
+              setOpenAiKeySet(!!profile.openAiKey);
+            } else {
+              setOpenAiKeySet(false);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to determine OpenAI key status', err);
+          setOpenAiKeySet(false);
+        }
       } catch (e) {
         console.error('Error loading saved settings', e);
       }
@@ -181,6 +202,24 @@ export function QuestionSettingsWidget({
             {projectName || 'Not configured'}
           </Text>
         </Pressable>
+
+        <View style={[styles.settingDivider, { backgroundColor: colors.border }]} />
+
+        <View style={styles.settingRow}>
+          <View style={styles.settingLabelContainer}>
+            <LockIcon size="sm" color={colors.textSecondary} />
+            <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Open API Key</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            {openAiKeySet === null ? (
+              <ActivityIndicator size="small" />
+            ) : openAiKeySet ? (
+              <Text style={[styles.settingValue, { color: colors.text }]}>Configured</Text>
+            ) : (
+              <Text style={[styles.settingValue, { color: colors.textSecondary }]}>Not configured — set in web</Text>
+            )}
+          </View>
+        </View>
 
         <View style={[styles.settingDivider, { backgroundColor: colors.border }]} />
 

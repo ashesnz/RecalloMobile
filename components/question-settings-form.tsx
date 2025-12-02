@@ -1,418 +1,248 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Alert,
-  Platform,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Modal, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Colors } from '@/constants/theme';
-import { Project, QuestionSettings } from '@/types/project';
+import { FolderIcon, TimeIcon } from '@/components/ui/icon';
+import { Colors as ThemeColors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { apiService } from '@/services/api';
 import { settingsStorage } from '@/services/settings-storage';
+import { ProjectList } from './project-list';
+import { useAppDispatch, useAppSelector } from '@/stores/hooks';
+import { getProfileFulfilled } from '@/stores/auth/authSlice';
+import type { UpdateUserDto, User } from '@/types/auth';
 
 interface QuestionSettingsFormProps {
-  onSave: (settings: QuestionSettings) => void;
-  onCancel: () => void;
-  initialSettings?: QuestionSettings | null;
+  projectName?: string | null;
+  scheduledTime?: string | null;
+  onSettingsChange?: (settings: any) => void;
 }
 
-export function QuestionSettingsForm({
-  onSave,
-  onCancel,
-  initialSettings,
-}: QuestionSettingsFormProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    initialSettings?.projectId || null
-  );
-  const [selectedTime, setSelectedTime] = useState<Date>(() => {
-    if (initialSettings?.scheduledTime) {
-      return new Date(initialSettings.scheduledTime);
-    }
-    // Default to 9:00 AM
-    const now = new Date();
-    now.setHours(9, 0, 0, 0);
-    return now;
-  });
+export function QuestionSettingsForm({ projectName: initialProjectName, scheduledTime: initialScheduledTime, onSettingsChange }: QuestionSettingsFormProps) {
+  const colors: any = ThemeColors.light;
+  const dispatch = useAppDispatch();
+  const currentUser = useAppSelector((s: any) => s.auth?.user ?? null) as User | null;
+
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState<string | null>(initialProjectName ?? null);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [tempTime, setTempTime] = useState<Date | null>(initialScheduledTime ? new Date(initialScheduledTime) : null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    loadProjects();
-  }, []);
+    (async () => {
+      try {
+        const saved = await settingsStorage.getSettings();
+        if (saved?.projectId) {
+          setSelectedProjectId(saved.projectId);
+          if (saved.projectName) setProjectName(saved.projectName);
+        } else if (currentUser?.preferredProjectId) {
+          const serverProjectId = currentUser.preferredProjectId;
+          setSelectedProjectId(serverProjectId ?? null);
 
-  const loadProjects = async () => {
+          try {
+            setLoadingProjects(true);
+            const list = await apiService.getProjects();
+            setProjects(list || []);
+            const match = (list || []).find((p: any) => p.id === serverProjectId);
+            const resolvedName = match?.name ?? null;
+            setProjectName(resolvedName);
+            const newSettings = {
+              projectId: serverProjectId || null,
+              projectName: resolvedName,
+              scheduledTime: saved?.scheduledTime || initialScheduledTime || null,
+            };
+            await settingsStorage.saveSettings(newSettings);
+            if (onSettingsChange) onSettingsChange(newSettings);
+          } catch (err) {
+            console.error('Failed to fetch projects to resolve server preferred project', err);
+          } finally {
+            setLoadingProjects(false);
+          }
+        } else {
+          // no saved settings and no server preferred project: use provided initial props
+          if (initialProjectName && !saved?.projectId) setProjectName(initialProjectName);
+          if (initialScheduledTime && !saved?.scheduledTime) setTempTime(new Date(initialScheduledTime));
+        }
+        if (saved?.scheduledTime) setTempTime(new Date(saved.scheduledTime));
+      } catch (e) {
+        console.error('Error loading saved settings', e);
+      }
+    })();
+  }, [currentUser, onSettingsChange, initialProjectName, initialScheduledTime]);
+
+  const openModal = async () => {
+    setModalVisible(true);
+    setLoadingProjects(true);
     try {
-      setLoading(true);
-      const fetchedProjects = await apiService.getProjects();
-      setProjects(fetchedProjects);
-    } catch (error) {
-      console.error('Error loading projects:', error);
-      Alert.alert('Error', 'Failed to load projects. Please try again.');
+      const list = await apiService.getProjects();
+      setProjects(list || []);
+    } catch (e) {
+      console.error('Failed to load projects', e);
+      setProjects([]);
     } finally {
-      setLoading(false);
+      setLoadingProjects(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!selectedProjectId) {
-      Alert.alert('Validation Error', 'Please select a project');
-      return;
-    }
+  const handleCancel = () => setModalVisible(false);
 
+  const handleOk = async () => {
     try {
-      setSaving(true);
-      const settings: QuestionSettings = {
-        projectId: selectedProjectId,
-        scheduledTime: selectedTime.toISOString(),
+      const existing = await settingsStorage.getSettings();
+      const selectedProject = projects.find((p: any) => p.id === selectedProjectId);
+      const newSettings = {
+        projectId: selectedProjectId || null,
+        projectName: selectedProject?.name || existing?.projectName || projectName || null,
+        scheduledTime: existing?.scheduledTime || null,
       };
+      await settingsStorage.saveSettings(newSettings);
+      setProjectName(newSettings.projectName || null);
 
-      await settingsStorage.saveSettings(settings);
-      onSave(settings);
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      Alert.alert('Error', 'Failed to save settings. Please try again.');
-    } finally {
-      setSaving(false);
+      if (selectedProjectId) {
+        const dto: UpdateUserDto = { preferredProjectId: selectedProjectId };
+        try {
+          const updatedUser = await apiService.updateUser(dto);
+          dispatch(getProfileFulfilled({ user: updatedUser }));
+        } catch (apiErr) {
+          console.error('Failed to update preferred project on server', apiErr);
+        }
+      }
+
+      setModalVisible(false);
+      if (onSettingsChange) onSettingsChange(newSettings);
+    } catch (e) {
+      console.error('Failed to save settings', e);
     }
   };
 
-  const handleTimeChange = (event: any, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-
-    if (date) {
-      setSelectedTime(date);
-    }
+  const openTimePicker = () => {
+    setTempTime(tempTime ?? new Date());
+    setShowTimePicker(true);
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
-        <Text style={styles.loadingText}>Loading projects...</Text>
-      </View>
-    );
-  }
+  const onTimeChange = async (event: any, date?: Date) => {
+    try {
+      if (Platform.OS === 'android') {
+        setShowTimePicker(false);
+        if (!date) return;
+      } else {
+        if (!date) return;
+        setShowTimePicker(false);
+      }
+
+      setTempTime(date || null);
+      const existing = await settingsStorage.getSettings();
+      const newSettings = {
+        projectId: existing?.projectId || selectedProjectId || null,
+        projectName: existing?.projectName || projectName || null,
+        scheduledTime: date?.toISOString() || null,
+      };
+      await settingsStorage.saveSettings(newSettings);
+      if (onSettingsChange) onSettingsChange(newSettings);
+    } catch (err) {
+      console.error('Failed to save scheduled time', err);
+    }
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Question Settings</Text>
-        <Text style={styles.headerSubtitle}>
-          Choose a project and time for your daily questions
+    <View style={[styles.section, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
+      <Pressable onPress={openModal} style={styles.settingRow} android_ripple={{ color: colors.border }}>
+        <View style={styles.settingLabelContainer}>
+          <FolderIcon size="sm" color={colors.textSecondary} />
+          <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Project</Text>
+        </View>
+        <Text style={[styles.settingValue, { color: colors.text }]}>
+          {projectName || 'Not configured'}
         </Text>
-      </View>
+      </Pressable>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Project</Text>
-          <Text style={styles.sectionDescription}>
-            Questions will be generated from this project
-          </Text>
+      <View style={[styles.settingDivider, { backgroundColor: colors.border }]} />
 
-          {projects.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No projects available. Create a project first.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.projectList}>
-              {projects.map((project) => (
-                <Pressable
-                  key={project.id}
-                  style={({ pressed }) => [
-                    styles.projectItem,
-                    selectedProjectId === project.id && styles.projectItemSelected,
-                    pressed && styles.projectItemPressed,
-                  ]}
-                  onPress={() => setSelectedProjectId(project.id)}
-                >
-                  <View style={styles.projectItemContent}>
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        selectedProjectId === project.id && styles.radioCircleSelected,
-                      ]}
-                    >
-                      {selectedProjectId === project.id && (
-                        <View style={styles.radioCircleInner} />
-                      )}
-                    </View>
-                    <View style={styles.projectInfo}>
-                      <Text style={styles.projectName}>{project.name}</Text>
-                      {project.description && (
-                        <Text style={styles.projectDescription}>
-                          {project.description}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-          )}
+      <Pressable onPress={openTimePicker} style={styles.settingRow} android_ripple={{ color: colors.border }}>
+        <View style={styles.settingLabelContainer}>
+          <TimeIcon size="sm" color={colors.textSecondary} />
+          <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Time</Text>
         </View>
+        <Text style={[styles.settingValue, { color: colors.text }]}>
+          {tempTime ? formatTime(tempTime.toISOString()) : 'Not configured'}
+        </Text>
+      </Pressable>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Schedule Time</Text>
-          <Text style={styles.sectionDescription}>
-            When should questions be generated daily?
-          </Text>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.timeButton,
-              pressed && styles.timeButtonPressed,
-            ]}
-            onPress={() => setShowTimePicker(true)}
-          >
-            <Text style={styles.timeButtonLabel}>Time:</Text>
-            <Text style={styles.timeButtonValue}>
-              {selectedTime.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              })}
-            </Text>
-          </Pressable>
-
-          {(showTimePicker || Platform.OS === 'ios') && (
-            <DateTimePicker
-              value={selectedTime}
-              mode="time"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleTimeChange}
-              style={styles.timePicker}
-            />
-          )}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <View style={{ width: '92%', borderRadius: BorderRadius.lg, padding: Spacing.base, backgroundColor: colors.card }}>
+            <Text style={{ fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold, color: colors.text }}>Select Project</Text>
+            {loadingProjects ? (
+              <ActivityIndicator style={{ marginTop: 16 }} />
+            ) : (
+              <ProjectList projects={projects} currentProjectId={selectedProjectId} onSelect={(id: string) => setSelectedProjectId(id)} />
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.md, marginTop: Spacing.md }}>
+              <Pressable onPress={handleCancel} style={{ paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: BorderRadius.md, backgroundColor: colors.card }}>
+                <Text style={{ color: colors.textSecondary }}>{'Cancel'}</Text>
+              </Pressable>
+              <Pressable onPress={handleOk} disabled={!selectedProjectId} style={{ paddingVertical: Spacing.sm, paddingHorizontal: Spacing.lg, borderRadius: BorderRadius.md, backgroundColor: selectedProjectId ? colors.primary : colors.card }}>
+                <Text style={{ color: selectedProjectId ? '#fff' : colors.textSecondary }}>{'OK'}</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </ScrollView>
+      </Modal>
 
-      <View style={styles.footer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.cancelButton,
-            pressed && styles.cancelButtonPressed,
-          ]}
-          onPress={onCancel}
-          disabled={saving}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.saveButton,
-            pressed && styles.saveButtonPressed,
-            saving && styles.saveButtonDisabled,
-          ]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </Pressable>
-      </View>
+      {showTimePicker && (
+        <DateTimePicker
+          value={tempTime ?? new Date()}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onTimeChange}
+        />
+      )}
     </View>
   );
 }
 
+function formatTime(isoTime: string): string {
+  try {
+    const date = new Date(isoTime);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } catch {
+    return isoTime;
+  }
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.light.background,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: Colors.light.textSecondary,
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: Colors.light.textSecondary,
-    lineHeight: 22,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
   section: {
-    marginTop: 24,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.base,
+    marginBottom: Spacing.base,
+    borderWidth: 1,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 6,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    marginBottom: Spacing.sm,
   },
-  sectionDescription: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  emptyState: {
-    padding: 24,
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: 15,
-    color: Colors.light.textSecondary,
-    textAlign: 'center',
-  },
-  projectList: {
-    gap: 12,
-  },
-  projectItem: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  projectItemSelected: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.primaryLight || Colors.light.card,
-  },
-  projectItemPressed: {
-    opacity: 0.7,
-  },
-  projectItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.light.border,
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioCircleSelected: {
-    borderColor: Colors.light.primary,
-  },
-  radioCircleInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.light.primary,
-  },
-  projectInfo: {
-    flex: 1,
-  },
-  projectName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 4,
-  },
-  projectDescription: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    lineHeight: 18,
-  },
-  timeButton: {
+  settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    padding: 16,
+    paddingVertical: Spacing.sm,
   },
-  timeButtonPressed: {
-    opacity: 0.7,
-  },
-  timeButtonLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.light.textSecondary,
-  },
-  timeButtonValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.primary,
-  },
-  timePicker: {
-    marginTop: 12,
-  },
-  footer: {
+  settingLabelContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 32,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    paddingVertical: 14,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: Spacing.sm,
   },
-  cancelButtonPressed: {
-    opacity: 0.7,
+  settingLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
+  settingValue: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    maxWidth: '50%',
+    textAlign: 'right',
   },
-  saveButton: {
-    flex: 1,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveButtonPressed: {
-    opacity: 0.8,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  settingDivider: { height: 1, marginVertical: Spacing.xs },
 });

@@ -5,55 +5,25 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { showAlert } from '@/utils/alert';
-import { QuestionSettingsWidget } from '@/components/question-settings-widget';
+import { SettingsWidget } from '@/components/settings-widget';
 import { settingsStorage } from '@/services/settings-storage';
-import { apiService } from '@/services/api';
 
 export function SettingsScreen() {
   const { user, logout, isLoadingUser } = useAuth();
   const colorScheme = useColorScheme();
   const colors = ThemeColors[colorScheme ?? 'light'];
-  const [projectName, setProjectName] = useState<string | undefined>(undefined);
   const [questionSettings, setQuestionSettings] = useState<any>(null);
 
   useEffect(() => {
-    loadSettings();
+    (async () => {
+      try {
+        const saved = await settingsStorage.getSettings();
+        if (saved) setQuestionSettings(saved);
+      } catch (e) {
+        console.error('Failed to load settings', e);
+      }
+    })();
   }, []);
-
-  useEffect(() => {
-    if (questionSettings?.projectId) {
-      loadProjectName(questionSettings.projectId);
-    }
-  }, [questionSettings?.projectId]);
-
-  const loadSettings = async () => {
-    try {
-      const saved = await settingsStorage.getSettings();
-      if (saved) setQuestionSettings(saved);
-      if (saved?.projectName) setProjectName(saved.projectName);
-    } catch (e) {
-      console.error('Failed to load settings', e);
-    }
-  };
-
-  const loadProjectName = async (projectId: string) => {
-    try {
-      const projects = await apiService.getProjects();
-      const project = projects.find((p) => p.id === projectId);
-      setProjectName(project?.name);
-    } catch (e) {
-      console.error('Failed to load project name', e);
-    }
-  };
-
-  const handleSaveSettings = (settings: any) => {
-    setQuestionSettings(settings);
-    if (settings?.projectName) {
-      setProjectName(settings.projectName);
-    } else if (settings?.projectId) {
-      loadProjectName(settings.projectId);
-    }
-  };
 
   const handleLogout = () => {
     showAlert.confirmDestructive(
@@ -79,7 +49,7 @@ export function SettingsScreen() {
           <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
         </View>
 
-        <QuestionSettingsWidget projectName={projectName} scheduledTime={questionSettings?.scheduledTime} onSettingsChange={handleSaveSettings} />
+        <SettingsWidget projectName={questionSettings?.projectName} scheduledTime={questionSettings?.scheduledTime} onSettingsChange={(s) => setQuestionSettings(s)} />
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>About</Text>
@@ -206,4 +176,3 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 });
-
