@@ -1,7 +1,7 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, isAxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { API_CONFIG, API_TIMEOUT } from '@/constants/api';
+import { API_CONFIG, API_TIMEOUT, setApiBaseUrl } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
 import { Project } from '@/types/project';
 
@@ -21,6 +21,8 @@ class ApiService {
         'Content-Type': 'application/json',
       },
     });
+
+    console.log('[API] Initialized with baseURL:', API_CONFIG.BASE_URL);
 
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
@@ -141,7 +143,7 @@ class ApiService {
       console.log('[API] Logout endpoint responded:', response.status, response.statusText);
     } catch (error) {
       console.error('[API] Logout API error:', error);
-      if (axios.isAxiosError(error)) {
+      if (isAxiosError(error)) {
         console.error('[API] Logout error details:', {
           status: error.response?.status,
           statusText: error.response?.statusText,
@@ -180,9 +182,17 @@ class ApiService {
     }
   }
 
+  // New: allow updating base URL at runtime
+  setBaseUrl(url: string) {
+    if (!url) return;
+    setApiBaseUrl(url);
+    this.api.defaults.baseURL = url;
+    console.log('[API] Base URL updated to:', url);
+  }
+
   // Error handler
   private handleError(error: any): Error {
-    if (axios.isAxiosError(error)) {
+    if (isAxiosError(error)) {
       const axiosError = error as AxiosError<{ message?: string }>;
 
       if (axiosError.response) {
@@ -205,4 +215,3 @@ class ApiService {
 }
 
 export const apiService = new ApiService();
-

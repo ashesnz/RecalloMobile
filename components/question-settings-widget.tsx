@@ -1,27 +1,79 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { SettingsIcon, FolderIcon, TimeIcon } from '@/components/ui/icon';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Modal, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SettingsIcon, FolderIcon, TimeIcon, CheckIcon } from '@/components/ui/icon';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import { apiService } from '@/services/api';
+import { settingsStorage } from '@/services/settings-storage';
 
 interface QuestionSettingsWidgetProps {
-  onPress: () => void;
   projectName?: string;
   scheduledTime?: string;
+  onSettingsChange?: (settings: any) => void;
 }
 
 export function QuestionSettingsWidget({
-  onPress,
   projectName,
-  scheduledTime
+  scheduledTime,
+  onSettingsChange,
 }: QuestionSettingsWidgetProps) {
-  const colorScheme = useColorScheme();
-  const colors = ThemeColors[colorScheme ?? 'light'];
+  // Use the app light theme tokens so the widget matches the Explore/Profile page styling
+  const colors: any = ThemeColors.light;
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // load currently saved settings to pre-select project
+    (async () => {
+      try {
+        const saved = await settingsStorage.getSettings();
+        if (saved?.projectId) setSelectedProjectId(saved.projectId);
+      } catch (e) {
+        console.error('Error loading saved settings', e);
+      }
+    })();
+  }, []);
+
+  const openModal = async () => {
+    setModalVisible(true);
+    setLoadingProjects(true);
+    try {
+      const list = await apiService.getProjects();
+      setProjects(list || []);
+    } catch (e) {
+      console.error('Failed to load projects', e);
+      setProjects([]);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setModalVisible(false);
+  };
+
+  const handleOk = async () => {
+    // Save selected project to settings storage, preserving scheduledTime if present
+    try {
+      const existing = await settingsStorage.getSettings();
+      const newSettings = {
+        projectId: selectedProjectId || null,
+        scheduledTime: existing?.scheduledTime || scheduledTime || null,
+      };
+      await settingsStorage.saveSettings(newSettings);
+      setModalVisible(false);
+      if (onSettingsChange) onSettingsChange(newSettings);
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
+    <View style={[styles.container, { backgroundColor: colors.card || colors.background }]}>
       <View style={styles.header}>
-        <SettingsIcon size="md" variant="primary" />
+        <SettingsIcon size="md" color={colors.primary} />
         <View style={styles.headerText}>
           <Text style={[styles.title, { color: colors.text }]}>Question Settings</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -31,21 +83,21 @@ export function QuestionSettingsWidget({
       </View>
 
       <View style={[styles.settingsDisplay, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-        <View style={styles.settingRow}>
+        <Pressable onPress={openModal} style={styles.settingRow} android_ripple={{ color: colors.border }}>
           <View style={styles.settingLabelContainer}>
-            <FolderIcon size="sm" variant="textSecondary" />
+            <FolderIcon size="sm" color={colors.textSecondary} />
             <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Project</Text>
           </View>
           <Text style={[styles.settingValue, { color: colors.text }]}>
             {projectName || 'Not configured'}
           </Text>
-        </View>
+        </Pressable>
 
         <View style={[styles.settingDivider, { backgroundColor: colors.border }]} />
 
         <View style={styles.settingRow}>
           <View style={styles.settingLabelContainer}>
-            <TimeIcon size="sm" variant="textSecondary" />
+            <TimeIcon size="sm" color={colors.textSecondary} />
             <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Time</Text>
           </View>
           <Text style={[styles.settingValue, { color: colors.text }]}>
@@ -54,20 +106,62 @@ export function QuestionSettingsWidget({
         </View>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          {
-            backgroundColor: colors.primary || '#8b5cf6',  // Fallback to purple if undefined
-          },
-          pressed && styles.buttonPressed
-        ]}
-        onPress={onPress}
-      >
-        <Text style={styles.buttonText}>
-          {projectName ? 'Edit Settings' : 'Configure Settings'}
-        </Text>
-      </Pressable>
+      {/* Modal for project selection */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[modalStyles.modalTitle, { color: colors.text }]}>Select Project</Text>
+
+            {loadingProjects ? (
+              <ActivityIndicator style={{ marginTop: 16 }} />
+            ) : (
+              <FlatList
+                data={projects}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const selected = selectedProjectId === item.id;
+                  return (
+                    <TouchableOpacity
+                      onPress={() => setSelectedProjectId(item.id)}
+                      style={[
+                        modalStyles.projectRow,
+                        selected && { backgroundColor: colors.primaryLight || '#eef2ff', borderRadius: 8 },
+                      ]}
+                    >
+                      <Text style={[modalStyles.projectName, { color: colors.text }]}>{item.name}</Text>
+                      {selected && <CheckIcon size="md" color={colors.primary} />}
+                    </TouchableOpacity>
+                  );
+                }}
+                ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border }} />}
+                style={{ marginTop: 12, maxHeight: 320 }}
+              />
+            )}
+
+            <View style={modalStyles.modalFooter}>
+              <Pressable
+                style={({ pressed }) => [
+                  modalStyles.modalButton,
+                  { backgroundColor: colors.card, opacity: pressed ? 0.8 : 1 },
+                ]}
+                onPress={handleCancel}
+              >
+                <Text style={[modalStyles.modalButtonText, { color: colors.textSecondary }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={handleOk}
+                disabled={!selectedProjectId}
+                style={({ pressed }) => [
+                  modalStyles.modalButton,
+                  { backgroundColor: selectedProjectId ? colors.primary : colors.card, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Text style={[modalStyles.modalButtonText, { color: selectedProjectId ? '#fff' : colors.textSecondary }]}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -78,7 +172,7 @@ function formatTime(isoTime: string): string {
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   } catch {
     return isoTime;
@@ -87,10 +181,12 @@ function formatTime(isoTime: string): string {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
+    marginHorizontal: 0,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.base,
     ...Shadow.medium,
   },
   header: {
@@ -142,20 +238,49 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: Spacing.xs,
   },
-  button: {
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
+});
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    ...Shadow.small,
+    alignItems: 'center',
   },
-  buttonPressed: {
-    opacity: 0.8,
+  card: {
+    width: '92%',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.base,
+    borderWidth: 1,
+    maxHeight: '80%',
   },
-  buttonText: {
-    color: '#ffffff',
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  projectRow: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  projectName: {
+    fontSize: Typography.fontSize.base,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  modalButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+  },
+  modalButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
   },
 });
-

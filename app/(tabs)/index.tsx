@@ -4,7 +4,6 @@ import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/app/screens/results';
 import { FeedbackDetail } from '@/components/feedback-detail';
 import { DailyQuestionsWidget } from '@/components/daily-questions-widget';
-import { QuestionSettingsWidget } from '@/components/question-settings-widget';
 import { QuestionSettingsForm } from '@/components/question-settings-form';
 import { mockQuestions, getMockResults } from '@/data/mock-data';
 import { QuestionResponse, QuestionResult } from '@/types/question';
@@ -22,20 +21,12 @@ export default function HomeScreen() {
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
   const [questionSettings, setQuestionSettings] = useState<QuestionSettings | null>(null);
-  const [projectName, setProjectName] = useState<string | undefined>(undefined);
   const { user } = useAuth();
 
   // Load saved settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
-
-  // Load project name when settings change
-  useEffect(() => {
-    if (questionSettings?.projectId) {
-      loadProjectName(questionSettings.projectId);
-    }
-  }, [questionSettings?.projectId]);
 
   const loadSettings = async () => {
     try {
@@ -48,23 +39,9 @@ export default function HomeScreen() {
     }
   };
 
-  const loadProjectName = async (projectId: string) => {
-    try {
-      const projects = await apiService.getProjects();
-      const project = projects.find((p) => p.id === projectId);
-      setProjectName(project?.name);
-    } catch (error) {
-      console.error('Error loading project name:', error);
-    }
-  };
-
   const handleStartSession = () => {
     setResults([]);
     setAppState('questions');
-  };
-
-  const handleOpenSettings = () => {
-    setAppState('settings');
   };
 
   const handleSaveSettings = (settings: QuestionSettings) => {
@@ -75,8 +52,6 @@ export default function HomeScreen() {
   const handleCancelSettings = () => {
     setAppState('dashboard');
   };
-
-
 
   const handleQuestionsComplete = (completedResponses: QuestionResponse[]) => {
     // Simulate LLM evaluation with mock results
@@ -110,11 +85,6 @@ export default function HomeScreen() {
 
           <DailyQuestionsWidget onPress={handleStartSession} />
 
-          <QuestionSettingsWidget
-            onPress={handleOpenSettings}
-            projectName={projectName}
-            scheduledTime={questionSettings?.scheduledTime || undefined}
-          />
         </View>
       </ScrollView>
     );

@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Colors } from '@/constants/colors';
+import { Colors } from '@/constants/theme';
 import { Project, QuestionSettings } from '@/types/project';
 import { apiService } from '@/services/api';
 import { settingsStorage } from '@/services/settings-storage';
@@ -96,7 +96,7 @@ export function QuestionSettingsForm({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={Colors.light.primary} />
         <Text style={styles.loadingText}>Loading projects...</Text>
       </View>
     );
@@ -232,35 +232,35 @@ export function QuestionSettingsForm({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.light.background,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.light.border,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: Colors.light.text,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
     lineHeight: 22,
   },
   content: {
@@ -273,38 +273,38 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.light.text,
     marginBottom: 6,
   },
   sectionDescription: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
     marginBottom: 16,
     lineHeight: 20,
   },
   emptyState: {
     padding: 24,
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.light.card,
     borderRadius: 12,
     alignItems: 'center',
   },
   emptyStateText: {
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
     textAlign: 'center',
   },
   projectList: {
     gap: 12,
   },
   projectItem: {
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.light.card,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   projectItemSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight || Colors.card,
+    borderColor: Colors.light.primary,
+    backgroundColor: Colors.light.primaryLight || Colors.light.card,
   },
   projectItemPressed: {
     opacity: 0.7,
@@ -319,19 +319,19 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: Colors.border,
+    borderColor: Colors.light.border,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioCircleSelected: {
-    borderColor: Colors.primary,
+    borderColor: Colors.light.primary,
   },
   radioCircleInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.light.primary,
   },
   projectInfo: {
     flex: 1,
@@ -339,19 +339,19 @@ const styles = StyleSheet.create({
   projectName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.light.text,
     marginBottom: 4,
   },
   projectDescription: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
     lineHeight: 18,
   },
   timeButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.light.card,
     borderRadius: 12,
     padding: 16,
   },
@@ -361,12 +361,12 @@ const styles = StyleSheet.create({
   timeButtonLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.textSecondary,
+    color: Colors.light.textSecondary,
   },
   timeButtonValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.light.primary,
   },
   timePicker: {
     marginTop: 12,
@@ -378,11 +378,11 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.light.border,
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.light.card,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -394,11 +394,11 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.light.text,
   },
   saveButton: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.light.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -416,4 +416,3 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
-

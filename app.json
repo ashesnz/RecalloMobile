@@ -9,7 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "52.63.19.204": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": false,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true
+            }
+          },
+          "NSAllowsArbitraryLoadsInWebContent": true
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -49,7 +61,8 @@
       "router": {},
       "eas": {
         "projectId": "ad9bdad3-ee14-4342-9204-c53279a3f8fc"
-      }
+      },
+      "API_BASE_URL": "http://52.63.19.204:5298"
     }
   }
 }
