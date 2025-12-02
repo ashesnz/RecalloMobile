@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 
 // Default and fallback base URLs
 const DEFAULT_LOCAL_HOST = 'http://localhost:5298';
-const DEFAULT_REMOTE = 'http://54.153.148.249:5298'; // Intentionally use HTTP for this remote host so the app can connect over cleartext. This is required when the server only exposes an HTTP endpoint.
+const DEFAULT_REMOTE = 'http://localhost:5298'; // Intentionally use HTTP for this remote host so the app can connect over cleartext. This is required when the server only exposes an HTTP endpoint.
 
 // Resolve base URL from multiple sources (in order):
 // 1. process.env.API_BASE_URL (useful for CI / bundler env)

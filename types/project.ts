@@ -6,6 +6,6 @@ export interface Project {
 
 export interface QuestionSettings {
   projectId: string | null;
+  projectName?: string | null;
   scheduledTime: string | null; // ISO time string
 }
-

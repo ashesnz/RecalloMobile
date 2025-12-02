@@ -34,6 +34,7 @@ export default function ProfileScreen() {
     try {
       const saved = await settingsStorage.getSettings();
       if (saved) setQuestionSettings(saved);
+      if (saved?.projectName) setProjectName(saved.projectName);
     } catch (e) {
       console.error('Failed to load settings', e);
     }
@@ -51,8 +52,13 @@ export default function ProfileScreen() {
 
   const handleSaveSettings = (settings: any) => {
     setQuestionSettings(settings);
-    // refresh project name
-    if (settings?.projectId) loadProjectName(settings.projectId);
+    // use stored projectName when available to avoid extra network calls
+    if (settings?.projectName) {
+      setProjectName(settings.projectName);
+    } else if (settings?.projectId) {
+      // fallback to resolving name if name wasn't stored
+      loadProjectName(settings.projectId);
+    }
   };
 
   const handleLogout = () => {
