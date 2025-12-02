@@ -1,7 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import * as Speech from 'expo-speech';
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors as ThemeColors } from '@/constants/theme';
 
@@ -9,59 +7,11 @@ interface SpeechBubbleProps {
   text: string;
   questionNumber: number;
   totalQuestions: number;
-  autoPlay?: boolean;
 }
 
-export function SpeechBubble({ text, questionNumber, totalQuestions, autoPlay = true }: SpeechBubbleProps) {
+export function SpeechBubble({ text, questionNumber, totalQuestions }: SpeechBubbleProps) {
   const colorScheme = useColorScheme();
   const colors = ThemeColors[colorScheme ?? 'light'];
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  useEffect(() => {
-    // Auto-play the question when it appears
-    if (autoPlay && text) {
-      speakQuestion();
-    }
-
-    // Cleanup: stop speaking when component unmounts
-    return () => {
-      Speech.stop();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, autoPlay]);
-
-  const speakQuestion = async () => {
-    try {
-      // Stop any ongoing speech
-      await Speech.stop();
-
-      setIsSpeaking(true);
-
-      Speech.speak(text, {
-        language: 'en-US',
-        pitch: 1.0,
-        rate: 0.9,
-        onDone: () => setIsSpeaking(false),
-        onStopped: () => setIsSpeaking(false),
-        onError: (error) => {
-          console.error('[SpeechBubble] Speech error:', error);
-          setIsSpeaking(false);
-        },
-      });
-    } catch (error) {
-      console.error('[SpeechBubble] Failed to speak:', error);
-      setIsSpeaking(false);
-    }
-  };
-
-  const handleSpeakerPress = async () => {
-    if (isSpeaking) {
-      await Speech.stop();
-      setIsSpeaking(false);
-    } else {
-      speakQuestion();
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -70,17 +20,8 @@ export function SpeechBubble({ text, questionNumber, totalQuestions, autoPlay = 
           Question {questionNumber} of {totalQuestions}
         </Text>
       </View>
+
       <View style={[styles.bubble, { backgroundColor: colors.primary }]}>
-        <Pressable
-          style={styles.speakerButton}
-          onPress={handleSpeakerPress}
-        >
-          <Ionicons
-            name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
-            size={24}
-            color="#ffffff"
-          />
-        </Pressable>
         <Text style={styles.text}>{text}</Text>
         <View style={[styles.tail, { borderTopColor: colors.primary }]} />
       </View>
@@ -116,13 +57,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  speakerButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    padding: 8,
-    zIndex: 1,
-  },
   text: {
     fontSize: 18,
     lineHeight: 26,
@@ -143,4 +77,3 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
   },
 });
-

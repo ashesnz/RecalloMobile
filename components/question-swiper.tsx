@@ -10,7 +10,7 @@ import {
 import { SpeechBubble } from '@/components/speech-bubble';
 import { MicButton } from '@/components/mic-button';
 import { Question, QuestionResponse } from '@/types/question';
-import { Colors } from '@/constants/colors';
+import { Colors } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -103,13 +103,31 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
             totalQuestions={questions.length}
           />
 
-          {/* Transcript display area */}
-          {currentTranscript && index === currentIndex && (
-            <View style={styles.transcriptContainer}>
-              <Text style={styles.transcriptLabel}>Your answer:</Text>
-              <Text style={styles.transcriptText}>{currentTranscript}</Text>
-            </View>
-          )}
+          {/* Transcript display area: show saved transcript for the question, or live transcript while recording */}
+          {(() => {
+            const saved = responses.find(r => r.questionId === item.id)?.transcript;
+            const showLive = index === currentIndex && currentTranscript && currentTranscript.trim().length > 0;
+
+            if (showLive) {
+              return (
+                <View style={styles.transcriptContainer}>
+                  <Text style={styles.transcriptLabel}>Your answer (live):</Text>
+                  <Text style={styles.transcriptText}>{currentTranscript}</Text>
+                </View>
+              );
+            }
+
+            if (saved && saved.trim().length > 0) {
+              return (
+                <View style={styles.transcriptContainer}>
+                  <Text style={styles.transcriptLabel}>Your answer:</Text>
+                  <Text style={styles.transcriptText}>{saved}</Text>
+                </View>
+              );
+            }
+
+            return null;
+          })()}
 
           <View style={styles.micContainer}>
             <MicButton
@@ -245,4 +263,3 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
-
