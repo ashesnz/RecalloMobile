@@ -3,6 +3,13 @@ export interface Question {
   text: string;
 }
 
+export interface DailyQuestion {
+  id: string;
+  question: string;
+  answer: string | null;
+  scheduledFor: string;
+}
+
 export interface QuestionResponse {
   questionId: string;
   audioUri?: string;

@@ -11,7 +11,6 @@ import { ChatIcon, RefreshIcon } from '@/components/ui/icon';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 import { Colors as ColorPalette } from '@/constants/colors';
-import { getMockResults, mockQuestions } from '@/data/mock-data';
 
 interface ResultsScreenProps {
   results: QuestionResult[];
@@ -23,10 +22,6 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
   const colorScheme = useColorScheme();
   const colors = ThemeColors[colorScheme ?? 'light'];
 
-  // Use mock results if no results are provided
-  const displayResults = results.length === 0
-    ? getMockResults(mockQuestions.map(q => q.id))
-    : results;
 
   const getGradeColor = (grade: string) => {
     const gradeColors = colorScheme === 'dark' ? ColorPalette.dark : ColorPalette.light;
@@ -49,7 +44,14 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
             Your Results
           </Text>
 
-          {displayResults.map((result, index) => (
+          {results.length === 0 ? (
+            <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                No results available. Please complete the questions first.
+              </Text>
+            </View>
+          ) : (
+            results.map((result, index) => (
             <Pressable
               key={result.questionId}
               style={({ pressed }) => [
@@ -85,7 +87,8 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
                 </Text>
               </View>
             </Pressable>
-          ))}
+          ))
+          )}
         </View>
 
         {/* Restart Button */}
@@ -124,6 +127,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
+  },
+  emptyState: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: Typography.fontSize.base,
+    textAlign: 'center',
   },
   resultCard: {
     padding: Spacing.base,

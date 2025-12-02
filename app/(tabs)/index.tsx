@@ -5,8 +5,7 @@ import { ResultsScreen } from '@/app/screens/results';
 import { FeedbackDetail } from '@/components/feedback-detail';
 import { DailyQuestionsWidget } from '@/components/daily-questions-widget';
 import { QuestionSettingsForm } from '@/components/question-settings-form';
-import { mockQuestions, getMockResults } from '@/data/mock-data';
-import { QuestionResponse, QuestionResult } from '@/types/question';
+import { QuestionResponse, QuestionResult, Question, DailyQuestion } from '@/types/question';
 import { QuestionSettings } from '@/types/project';
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -21,12 +20,40 @@ export default function HomeScreen() {
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
   const [questionSettings, setQuestionSettings] = useState<QuestionSettings | null>(null);
+  const [dailyQuestions, setDailyQuestions] = useState<DailyQuestion[]>([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const { user } = useAuth();
 
   // Load saved settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Poll for daily questions every 15 seconds
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchDailyQuestions = async () => {
+      try {
+        setIsLoadingQuestions(true);
+        const questions = await apiService.getDailyQuestions();
+        setDailyQuestions(questions);
+        console.log('[HomeScreen] Daily questions fetched:', questions.length);
+      } catch (error) {
+        console.error('[HomeScreen] Error fetching daily questions:', error);
+      } finally {
+        setIsLoadingQuestions(false);
+      }
+    };
+
+    // Fetch immediately on mount
+    fetchDailyQuestions();
+
+    // Then poll every 15 seconds
+    const interval = setInterval(fetchDailyQuestions, 15000);
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   const loadSettings = async () => {
     try {
@@ -40,6 +67,10 @@ export default function HomeScreen() {
   };
 
   const handleStartSession = () => {
+    if (dailyQuestions.length === 0) {
+      console.warn('[HomeScreen] No daily questions available');
+      return;
+    }
     setResults([]);
     setAppState('questions');
   };
@@ -53,9 +84,48 @@ export default function HomeScreen() {
     setAppState('dashboard');
   };
 
-  const handleQuestionsComplete = (completedResponses: QuestionResponse[]) => {
-    // Simulate LLM evaluation with mock results
-    const mockResults = getMockResults(completedResponses.map(r => r.questionId));
+  const handleQuestionsComplete = (_completedResponses: QuestionResponse[]) => {
+    console.log('[HomeScreen] Questions complete, generating mock results for backend questions');
+    console.log('[HomeScreen] Daily questions available:', dailyQuestions.length);
+
+    // Mock grading data - cycle through these for each question
+    const mockGradingData = [
+      {
+        grade: 'B' as const,
+        score: 73,
+        feedback: 'Good answer! You provided relevant points, but could have elaborated more on specific examples. Your reasoning was clear, though adding more depth would strengthen your response. Consider providing concrete scenarios to illustrate your points better.',
+      },
+      {
+        grade: 'A' as const,
+        score: 80,
+        feedback: 'Excellent response! You demonstrated strong understanding and communicated your ideas effectively. Your answer was well-structured and showed clear thought process. The examples you provided were relevant and helped illustrate your main points perfectly.',
+      },
+      {
+        grade: 'B' as const,
+        score: 65,
+        feedback: 'Solid answer with good foundational knowledge. You covered the main points adequately, but there\'s room for improvement in terms of detail and specificity. Try to provide more concrete examples and explain your reasoning more thoroughly next time.',
+      },
+    ];
+
+    // Generate mock results from all backend daily questions
+    const mockResults = dailyQuestions.map((dailyQuestion, index) => {
+      const gradingData = mockGradingData[index % mockGradingData.length];
+
+      console.log(`[HomeScreen] Creating result ${index + 1}:`, {
+        questionId: dailyQuestion.id,
+        question: dailyQuestion.question,
+      });
+
+      return {
+        questionId: dailyQuestion.id,
+        question: dailyQuestion.question,
+        grade: gradingData.grade,
+        score: gradingData.score,
+        feedback: gradingData.feedback,
+      };
+    });
+
+    console.log('[HomeScreen] Generated mock results:', mockResults.length);
     setResults(mockResults);
     setAppState('results');
   };
@@ -83,7 +153,11 @@ export default function HomeScreen() {
             {getPersonalizedGreeting(user?.name)}!
           </Text>
 
-          <DailyQuestionsWidget onPress={handleStartSession} />
+          <DailyQuestionsWidget
+            onPress={handleStartSession}
+            questionCount={dailyQuestions.length}
+            isLoading={isLoadingQuestions}
+          />
 
         </View>
       </ScrollView>
@@ -103,9 +177,15 @@ export default function HomeScreen() {
 
   // Questions Screen
   if (appState === 'questions') {
+    // Convert DailyQuestion to Question format for the QuestionSwiper
+    const questions: Question[] = dailyQuestions.map(dq => ({
+      id: dq.id,
+      text: dq.question,
+    }));
+
     return (
       <QuestionSwiper
-        questions={mockQuestions}
+        questions={questions}
         onComplete={handleQuestionsComplete}
       />
     );

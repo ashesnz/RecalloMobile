@@ -29,6 +29,7 @@ export const API_CONFIG = {
     USER_PROFILE: '/api/auth/me',
     USER_PROFILE_UPDATE: '/api/users/me',
     PROJECTS: '/api/projects',
+    DAILY_QUESTIONS: '/api/dailyquestions',
   },
 };
 

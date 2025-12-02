@@ -5,6 +5,7 @@ import { API_CONFIG, API_TIMEOUT, setApiBaseUrl } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
 import type { UpdateUserDto } from '@/types/auth';
 import { Project } from '@/types/project';
+import { DailyQuestion } from '@/types/question';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -192,6 +193,19 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Get projects error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Daily Questions endpoints
+  async getDailyQuestions(): Promise<DailyQuestion[]> {
+    try {
+      console.log('[API] Fetching daily questions');
+      const response = await this.api.get<DailyQuestion[]>(API_CONFIG.ENDPOINTS.DAILY_QUESTIONS);
+      console.log('[API] Daily questions fetched:', response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.error('Get daily questions error:', error);
       throw this.handleError(error);
     }
   }

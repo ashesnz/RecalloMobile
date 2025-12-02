@@ -6,11 +6,25 @@ import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/t
 
 interface DailyQuestionsWidgetProps {
   onPress: () => void;
+  questionCount?: number;
+  isLoading?: boolean;
 }
 
-export function DailyQuestionsWidget({ onPress }: DailyQuestionsWidgetProps) {
+export function DailyQuestionsWidget({ onPress, questionCount = 0, isLoading = false }: DailyQuestionsWidgetProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+
+  const displayText = isLoading
+    ? 'Loading questions...'
+    : questionCount > 0
+      ? `${questionCount} Question${questionCount !== 1 ? 's' : ''} of the Day`
+      : 'No questions available';
+
+  const descriptionText = isLoading
+    ? 'Fetching your daily questions'
+    : questionCount > 0
+      ? 'Answer today\'s questions by voice and get instant feedback'
+      : 'Check back later for new questions';
 
   return (
     <Pressable
@@ -23,14 +37,15 @@ export function DailyQuestionsWidget({ onPress }: DailyQuestionsWidgetProps) {
         },
       ]}
       onPress={onPress}
+      disabled={isLoading || questionCount === 0}
     >
       <View style={styles.content}>
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: colors.text }]}>
-            3 Questions of the Day
+            {displayText}
           </Text>
           <Text style={[styles.description, { color: colors.textSecondary }]}>
-            Answer today&apos;s questions by voice and get instant feedback
+            {descriptionText}
           </Text>
         </View>
         <View style={styles.iconContainer}>
