@@ -18,25 +18,33 @@ export function SettingsWidget({ projectName, scheduledTime, onSettingsChange }:
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s: any) => s.auth?.user ?? null);
 
-  const [openAiKeySet, setOpenAiKeySet] = useState<boolean | null>(null);
+  const [hasOpenAiKey, setHasOpenAiKey] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
+        // If we have a currentUser and it already reports an OpenAI key presence, trust it.
+        // Otherwise fetch the latest profile from the server to avoid relying on stale persisted state.
         if (currentUser) {
-          setOpenAiKeySet(!!currentUser.openAiKey);
-          return;
+          const currentHasKey = currentUser.hasOpenAiKey === true;
+          if (currentHasKey) {
+            setHasOpenAiKey(true);
+            return;
+          }
         }
+
+        // Otherwise fetch the authoritative profile from the backend
         const profile = await apiService.getUserProfile();
         if (profile) {
           dispatch(getProfileFulfilled({ user: profile }));
-          setOpenAiKeySet(!!profile.openAiKey);
+          const profileHasKey = Boolean((profile as any).hasOpenAiKey);
+          setHasOpenAiKey(profileHasKey);
         } else {
-          setOpenAiKeySet(false);
+          setHasOpenAiKey(false);
         }
       } catch (err) {
         console.error('Failed to determine OpenAI key status', err);
-        setOpenAiKeySet(false);
+        setHasOpenAiKey(false);
       }
     })();
   }, [currentUser, dispatch]);
@@ -61,9 +69,9 @@ export function SettingsWidget({ projectName, scheduledTime, onSettingsChange }:
             <LockIcon size="sm" color={colors.textSecondary} />
             <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Open AI Key</Text>
           </View>
-          {openAiKeySet === null ? (
+          {hasOpenAiKey === null ? (
             <ActivityIndicator size="small" />
-          ) : openAiKeySet ? (
+          ) : hasOpenAiKey ? (
             <Text style={[styles.settingValue, { color: colors.text }]} numberOfLines={1}>API Key Set</Text>
           ) : (
             <Text style={[styles.settingValue, { color: colors.textSecondary }]} numberOfLines={1}>Not configured</Text>

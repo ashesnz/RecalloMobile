@@ -34,11 +34,9 @@ export function AuthInitializer({ children }: AuthInitializerProps) {
 
   // Set OpenAI API key when user is loaded
   useEffect(() => {
-    if (user?.openAiKey) {
-      console.log('[AuthInitializer] Setting OpenAI API key for Whisper');
-      whisperService.setApiKey(user.openAiKey);
-    }
-  }, [user?.openAiKey]);
+    // If we need to support client-side key usage in future, implement a secure flow
+    // to set it here. For now, do nothing.
+  }, [user]);
 
   return <>{children}</>;
 }

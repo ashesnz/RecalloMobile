@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string;
   preferredProjectId?: string | null;
-  openAiKey?: string | null;
+  hasOpenAiKey?: boolean;
 }
 
 export interface LoginCredentials {
@@ -32,6 +32,5 @@ export interface AuthState {
 
 export interface UpdateUserDto {
   name?: string | null;
-  openAiKey?: string | null;
   preferredProjectId?: string | null;
 }

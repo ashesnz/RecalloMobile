@@ -29,7 +29,7 @@ export function QuestionSettingsWidget({
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [openAiKeySet, setOpenAiKeySet] = useState<boolean | null>(null);
+  const [hasOpenAiKey, setHasOpenAiKey] = useState<boolean | null>(null);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [tempTime, setTempTime] = useState<Date | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -72,26 +72,26 @@ export function QuestionSettingsWidget({
         // Prefer the current user from the store, but fall back to fetching the profile if needed.
         try {
           if (currentUser) {
-            setOpenAiKeySet(!!currentUser.openAiKey);
+            setHasOpenAiKey(Boolean(currentUser.hasOpenAiKey));
           } else {
             // fetch profile directly as a one-off to determine key state
             const profile = await apiService.getUserProfile();
             if (profile) {
               dispatch(getProfileFulfilled({ user: profile }));
-              setOpenAiKeySet(!!profile.openAiKey);
+              setHasOpenAiKey(Boolean((profile as any).hasOpenAiKey));
             } else {
-              setOpenAiKeySet(false);
+              setHasOpenAiKey(false);
             }
           }
         } catch (err) {
           console.error('Failed to determine OpenAI key status', err);
-          setOpenAiKeySet(false);
+          setHasOpenAiKey(false);
         }
       } catch (e) {
         console.error('Error loading saved settings', e);
       }
     })();
-  }, [currentUser, onSettingsChange, scheduledTime]);
+  }, [currentUser, onSettingsChange, scheduledTime, dispatch]);
 
   const openModal = async () => {
     setModalVisible(true);
@@ -210,15 +210,13 @@ export function QuestionSettingsWidget({
             <LockIcon size="sm" color={colors.textSecondary} />
             <Text style={[styles.settingLabel, { color: colors.textSecondary }]}>Open API Key</Text>
           </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            {openAiKeySet === null ? (
-              <ActivityIndicator size="small" />
-            ) : openAiKeySet ? (
-              <Text style={[styles.settingValue, { color: colors.text }]}>Configured</Text>
-            ) : (
-              <Text style={[styles.settingValue, { color: colors.textSecondary }]}>Not configured — set in web</Text>
-            )}
-          </View>
+          {hasOpenAiKey === null ? (
+            <ActivityIndicator size="small" />
+          ) : hasOpenAiKey ? (
+            <Text style={[styles.settingValue, { color: colors.text }]}>Configured</Text>
+          ) : (
+            <Text style={[styles.settingValue, { color: colors.textSecondary }]}>Not configured</Text>
+          )}
         </View>
 
         <View style={[styles.settingDivider, { backgroundColor: colors.border }]} />
@@ -334,6 +332,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     maxWidth: '50%',
+    minWidth: 0,
     textAlign: 'right',
   },
   settingDivider: {
