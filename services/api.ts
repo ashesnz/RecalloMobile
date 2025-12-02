@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { API_CONFIG, API_TIMEOUT, setApiBaseUrl } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
+import type { UpdateUserDto } from '@/types/auth';
 import { Project } from '@/types/project';
 
 const TOKEN_KEY = 'auth_token';
@@ -165,6 +166,19 @@ class ApiService {
       return response.data;
     } catch (error) {
       console.error('Get user profile error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Update current user's profile (name, OpenAI key, preferred project id)
+  async updateUser(dto: UpdateUserDto): Promise<User> {
+    try {
+      console.log('[API] Updating user profile', dto);
+      const response = await this.api.put<User>(API_CONFIG.ENDPOINTS.USER_PROFILE_UPDATE, dto);
+      console.log('[API] User profile updated');
+      return response.data;
+    } catch (error) {
+      console.error('Update user profile error:', error);
       throw this.handleError(error);
     }
   }

@@ -28,3 +28,8 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
+export interface UpdateUserDto {
+  name?: string | null;
+  openAiKey?: string | null;
+  preferredProjectId?: string | null;
+}

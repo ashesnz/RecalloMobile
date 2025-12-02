@@ -4,8 +4,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SettingsIcon, FolderIcon, TimeIcon } from '@/components/ui/icon';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 import { apiService } from '@/services/api';
+import type { UpdateUserDto } from '@/types/auth';
 import { settingsStorage } from '@/services/settings-storage';
 import { ProjectList, ProjectItem } from './project-list';
+import { useAppDispatch } from '@/stores/hooks';
+import { getProfileFulfilled } from '@/stores/auth/authSlice';
 
 interface QuestionSettingsWidgetProps {
   projectName?: string;
@@ -20,6 +23,7 @@ export function QuestionSettingsWidget({
 }: QuestionSettingsWidgetProps) {
   // Use the app light theme tokens so the widget matches the Explore/Profile page styling
   const colors: any = ThemeColors.light;
+  const dispatch = useAppDispatch();
 
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -70,6 +74,18 @@ export function QuestionSettingsWidget({
         scheduledTime: existing?.scheduledTime || scheduledTime || null,
       };
       await settingsStorage.saveSettings(newSettings);
+
+      if (selectedProjectId) {
+        const dto: UpdateUserDto = { preferredProjectId: selectedProjectId };
+        try {
+          const updatedUser = await apiService.updateUser(dto);
+          console.log('[QuestionSettings] Preferred project updated on server');
+          dispatch(getProfileFulfilled({ user: updatedUser }));
+        } catch (apiErr) {
+          console.error('Failed to update preferred project on server', apiErr);
+        }
+      }
+
       setModalVisible(false);
       if (onSettingsChange) onSettingsChange(newSettings);
     } catch (e) {
@@ -84,25 +100,35 @@ export function QuestionSettingsWidget({
   };
 
   const onTimeChange = async (event: any, date?: Date) => {
-    // On Android, picker closes after selection; on iOS it may remain
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-
-    if (date) {
-      setTempTime(date);
-      // Save new scheduled time to settingsStorage while preserving projectId
-      try {
-        const existing = await settingsStorage.getSettings();
-        const newSettings = {
-          projectId: existing?.projectId || selectedProjectId || null,
-          scheduledTime: date.toISOString(),
-        };
-        await settingsStorage.saveSettings(newSettings);
-        if (onSettingsChange) onSettingsChange(newSettings);
-      } catch (err) {
-        console.error('Failed to save scheduled time', err);
+    // The native picker returns different events across platforms.
+    // On Android, event.type === 'dismissed' when the user cancels.
+    // On iOS the picker may call onChange repeatedly; we only act when a date is provided.
+    try {
+      if (Platform.OS === 'android') {
+        // dialog-based picker: hide the picker immediately
+        setShowTimePicker(false);
+        if (!date) {
+          // user dismissed the dialog
+          return;
+        }
+      } else {
+        // iOS: close the inline spinner after selection
+        if (!date) return;
+        setShowTimePicker(false);
       }
+
+      // Persist the selected time
+      setTempTime(date);
+      const existing = await settingsStorage.getSettings();
+      const newSettings = {
+        projectId: existing?.projectId || selectedProjectId || null,
+        projectName: existing?.projectName || null,
+        scheduledTime: date.toISOString(),
+      };
+      await settingsStorage.saveSettings(newSettings);
+      if (onSettingsChange) onSettingsChange(newSettings);
+    } catch (err) {
+      console.error('Failed to save scheduled time', err);
     }
   };
 
