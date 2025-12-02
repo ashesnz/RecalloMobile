@@ -64,4 +64,3 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
   },
 });
-
