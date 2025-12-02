@@ -4,10 +4,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SettingsIcon, FolderIcon, TimeIcon } from '@/components/ui/icon';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 import { apiService } from '@/services/api';
-import type { UpdateUserDto } from '@/types/auth';
+import type { UpdateUserDto, User } from '@/types/auth';
 import { settingsStorage } from '@/services/settings-storage';
 import { ProjectList, ProjectItem } from './project-list';
-import { useAppDispatch } from '@/stores/hooks';
+import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { getProfileFulfilled } from '@/stores/auth/authSlice';
 
 interface QuestionSettingsWidgetProps {
@@ -24,6 +24,7 @@ export function QuestionSettingsWidget({
   // Use the app light theme tokens so the widget matches the Explore/Profile page styling
   const colors: any = ThemeColors.light;
   const dispatch = useAppDispatch();
+  const currentUser = useAppSelector((s: any) => s.auth?.user ?? null) as User | null;
 
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
@@ -37,13 +38,39 @@ export function QuestionSettingsWidget({
     (async () => {
       try {
         const saved = await settingsStorage.getSettings();
-        if (saved?.projectId) setSelectedProjectId(saved.projectId);
+        if (saved?.projectId) {
+          setSelectedProjectId(saved.projectId);
+        } else if (currentUser?.preferredProjectId) {
+          // If server has a preferred project, try to resolve its name and persist locally
+          const serverProjectId = currentUser.preferredProjectId;
+          setSelectedProjectId(serverProjectId ?? null);
+
+          // Try to resolve project name by fetching projects list (best-effort)
+          try {
+            setLoadingProjects(true);
+            const list = await apiService.getProjects();
+            setProjects(list || []);
+            const match = (list || []).find((p) => p.id === serverProjectId);
+            const resolvedName = match?.name ?? null;
+            const newSettings = {
+              projectId: serverProjectId || null,
+              projectName: resolvedName,
+              scheduledTime: saved?.scheduledTime || scheduledTime || null,
+            };
+            await settingsStorage.saveSettings(newSettings);
+            if (onSettingsChange) onSettingsChange(newSettings);
+          } catch (err) {
+            console.error('Failed to fetch projects to resolve server preferred project', err);
+          } finally {
+            setLoadingProjects(false);
+          }
+        }
         if (saved?.scheduledTime) setTempTime(new Date(saved.scheduledTime));
       } catch (e) {
         console.error('Error loading saved settings', e);
       }
     })();
-  }, []);
+  }, [currentUser, onSettingsChange, scheduledTime]);
 
   const openModal = async () => {
     setModalVisible(true);

@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  preferredProjectId?: string | null;
 }
 
 export interface LoginCredentials {
