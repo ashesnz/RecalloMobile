@@ -2,6 +2,7 @@ import { useEffect, ReactNode } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import Constants from 'expo-constants';
 import { apiService } from '@/services/api';
+import { whisperService } from '@/services/whisper-service';
 
 interface AuthInitializerProps {
   children: ReactNode;
@@ -12,7 +13,7 @@ interface AuthInitializerProps {
  * Also applies runtime API base URL override (if provided via env or expo extra)
  */
 export function AuthInitializer({ children }: AuthInitializerProps) {
-  const { loadUser } = useAuth();
+  const { loadUser, user } = useAuth();
 
   useEffect(() => {
     console.log('[AuthInitializer] Mounted, loading user');
@@ -30,6 +31,14 @@ export function AuthInitializer({ children }: AuthInitializerProps) {
 
     loadUser();
   }, [loadUser]);
+
+  // Set OpenAI API key when user is loaded
+  useEffect(() => {
+    if (user?.openAiKey) {
+      console.log('[AuthInitializer] Setting OpenAI API key for Whisper');
+      whisperService.setApiKey(user.openAiKey);
+    }
+  }, [user?.openAiKey]);
 
   return <>{children}</>;
 }

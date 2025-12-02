@@ -3,6 +3,7 @@ export interface User {
   email: string;
   name: string;
   preferredProjectId?: string | null;
+  openAiKey?: string | null;
 }
 
 export interface LoginCredentials {

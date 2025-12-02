@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   Animated,
+  Alert,
 } from 'react-native';
-import { MicIcon } from '@/components/ui/icon';
+import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow, IconSize } from '@/constants/theme';
 import { Colors as ColorPalette } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
+import { whisperService } from '@/services/whisper-service';
 
 interface MicButtonProps {
   onRecordingStart: () => void;
@@ -24,84 +26,146 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
   const colors = ThemeColors[colorScheme ?? 'light'];
   const gradeColors = colorScheme === 'dark' ? ColorPalette.dark : ColorPalette.light;
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [scaleAnim] = useState(new Animated.Value(1));
-  const transcriptIntervalRef = React.useRef<any>(null);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
 
-  const handlePressIn = () => {
-    setIsRecording(true);
-    onRecordingStart();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  useEffect(() => {
+    // Request audio permissions on mount
+    (async () => {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant microphone permission to record audio.');
+      }
+    })();
 
-    Animated.spring(scaleAnim, {
-      toValue: 1.1,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
+    return () => {
+      // Cleanup: stop recording if component unmounts
+      if (recording) {
+        recording.stopAndUnloadAsync().catch(console.error);
+      }
+    };
+  }, []);
 
-    // Simulate streaming transcript updates
-    if (onTranscriptUpdate) {
-      const mockWords = ['Hello', 'this', 'is', 'my', 'answer', 'to', 'the', 'question'];
-      let wordIndex = 0;
-      let currentTranscript = '';
+  const handlePressIn = async () => {
+    try {
+      console.log('[MicButton] Starting recording...');
 
-      transcriptIntervalRef.current = setInterval(() => {
-        if (wordIndex < mockWords.length) {
-          currentTranscript += (wordIndex > 0 ? ' ' : '') + mockWords[wordIndex];
-          onTranscriptUpdate(currentTranscript);
-          wordIndex++;
+      // Configure audio mode for recording
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      setRecording(newRecording);
+      setIsRecording(true);
+      onRecordingStart();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      Animated.spring(scaleAnim, {
+        toValue: 1.1,
+        useNativeDriver: true,
+        friction: 3,
+      }).start();
+
+      console.log('[MicButton] Recording started');
+    } catch (error) {
+      console.error('[MicButton] Failed to start recording:', error);
+      Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
+    }
+  };
+
+  const handlePressOut = async () => {
+    try {
+      if (!recording) return;
+
+      console.log('[MicButton] Stopping recording...');
+      setIsRecording(false);
+
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 3,
+      }).start();
+
+      console.log('[MicButton] Recording stopped, URI:', uri);
+
+      // Transcribe the audio using Whisper
+      if (uri && onTranscriptUpdate) {
+        setIsTranscribing(true);
+        try {
+          console.log('[MicButton] Starting transcription...');
+          const transcript = await whisperService.transcribeAudio(uri);
+          onTranscriptUpdate(transcript);
+          console.log('[MicButton] Transcription complete');
+        } catch (error) {
+          console.error('[MicButton] Transcription error:', error);
+          Alert.alert(
+            'Transcription Error',
+            error instanceof Error ? error.message : 'Failed to transcribe audio. Please try again.'
+          );
+        } finally {
+          setIsTranscribing(false);
         }
-      }, 500) as unknown as any;
+      }
+
+      onRecordingEnd();
+    } catch (error) {
+      console.error('[MicButton] Failed to stop recording:', error);
+      Alert.alert('Recording Error', 'Failed to stop recording. Please try again.');
     }
   };
 
-  const handlePressOut = () => {
-    setIsRecording(false);
-
-    // Clear transcript interval
-    if (transcriptIntervalRef.current) {
-      clearInterval(transcriptIntervalRef.current);
-      transcriptIntervalRef.current = null;
-    }
-
-    onRecordingEnd();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 3,
-    }).start();
-  };
+  const isProcessing = isRecording || isTranscribing;
+  const statusText = isTranscribing
+    ? 'Transcribing...'
+    : isRecording
+      ? 'Recording... Release to stop'
+      : 'Hold to record your answer';
 
   return (
     <View style={styles.container}>
       <Text style={[styles.instruction, { color: colors.textSecondary }]}>
-        {isRecording ? 'Recording... Release to stop' : 'Hold to record your answer'}
+        {statusText}
       </Text>
 
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Pressable
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
+          disabled={isTranscribing}
           style={[
             styles.micButton,
             {
-              backgroundColor: isRecording ? gradeColors.recording : colors.primary,
+              backgroundColor: isProcessing ? gradeColors.recording : colors.primary,
+              opacity: isTranscribing ? 0.6 : 1,
             },
           ]}
         >
           <Ionicons
-            name={isRecording ? 'stop-circle' : 'mic'}
+            name={isRecording ? 'stop-circle' : isTranscribing ? 'hourglass' : 'mic'}
             size={IconSize['2xl']}
             color="#ffffff"
           />
         </Pressable>
       </Animated.View>
 
-      {isRecording && (
+      {isProcessing && (
         <View style={styles.recordingIndicator}>
           <View style={[styles.recordingDot, { backgroundColor: gradeColors.recording }]} />
-          <Text style={[styles.recordingText, { color: gradeColors.recording }]}>Recording</Text>
+          <Text style={[styles.recordingText, { color: gradeColors.recording }]}>
+            {isTranscribing ? 'Transcribing' : 'Recording'}
+          </Text>
         </View>
       )}
     </View>
