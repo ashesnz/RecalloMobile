@@ -26,6 +26,7 @@ export const API_CONFIG = {
     USER_PROFILE_UPDATE: '/api/users/me',
     PROJECTS: '/api/projects',
     DAILY_QUESTIONS: '/api/dailyquestions',
+    WS_DAILY_QUESTIONS: '/ws/dailyquestions',
     TRANSCRIBE_AUDIO: '/api/audio/transcribe',
     EVALUATE_ANSWER: '/api/questions/evaluate',
   } as const,

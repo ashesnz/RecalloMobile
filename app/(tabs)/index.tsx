@@ -33,26 +33,38 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!user) return;
 
+    let isMounted = true;
+
     const fetchDailyQuestions = async () => {
       try {
         setIsLoadingQuestions(true);
         const questions = await apiService.getDailyQuestions();
+        if (!isMounted) return;
         setDailyQuestions(questions);
         console.log('[HomeScreen] Daily questions fetched:', questions.length);
       } catch (error) {
         console.error('[HomeScreen] Error fetching daily questions:', error);
       } finally {
-        setIsLoadingQuestions(false);
+        if (isMounted) setIsLoadingQuestions(false);
       }
     };
 
     // Fetch immediately on mount
     fetchDailyQuestions();
 
-    // Then poll every 15 seconds
-    const interval = setInterval(fetchDailyQuestions, 15000);
+    // Subscribe to real-time updates (WS) from apiService
+    const listener = (questions: DailyQuestion[]) => {
+      console.log('[HomeScreen] Received daily questions via WS:', questions.length);
+      if (!isMounted) return;
+      setDailyQuestions(questions);
+    };
 
-    return () => clearInterval(interval);
+    const unsubscribe = apiService.subscribeDailyQuestions(listener);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [user]);
 
   const loadSettings = async () => {
@@ -168,9 +180,26 @@ export default function HomeScreen() {
   if (appState === 'settings') {
     return (
       <QuestionSettingsForm
-        onSave={handleSaveSettings}
-        onCancel={handleCancelSettings}
-        initialSettings={questionSettings}
+        projectName={questionSettings?.projectName ?? null}
+        scheduledTime={questionSettings?.scheduledTime ?? null}
+        onSettingsChange={(settings: any) => {
+          // Treat this as save and return to dashboard
+          try {
+            if (settings && typeof settings === 'object') {
+              const maybe: QuestionSettings = {
+                projectId: settings.projectId ?? null,
+                projectName: settings.projectName ?? null,
+                scheduledTime: settings.scheduledTime ?? null,
+              };
+              handleSaveSettings(maybe);
+            } else {
+              handleCancelSettings();
+            }
+          } catch (err) {
+            console.error('Error handling settings change:', err);
+            handleCancelSettings();
+          }
+        }}
       />
     );
   }

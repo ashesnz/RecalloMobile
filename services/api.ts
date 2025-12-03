@@ -15,6 +15,13 @@ const isWeb = Platform.OS === 'web';
 class ApiService {
   private api: AxiosInstance;
 
+  // Real-time daily questions WebSocket manager
+  private dailyWs: WebSocket | null = null;
+  private dailyWsListeners: Set<(items: DailyQuestion[]) => void> = new Set();
+  private dailyWsReconnectAttempts = 0;
+  private dailyWsReconnectTimerId: number | null = null;
+  private dailyWsPingIntervalId: number | null = null; // heartbeat ping interval id
+
   constructor() {
     this.api = axios.create({
       baseURL: API_CONFIG.BASE_URL,
@@ -293,6 +300,194 @@ class ApiService {
     setApiBaseUrl(url);
     this.api.defaults.baseURL = url;
     console.log('[API] Base URL updated to:', url);
+  }
+
+  // Subscribe to real-time daily questions. Returns an unsubscribe function.
+  subscribeDailyQuestions(listener: (items: DailyQuestion[]) => void): () => void {
+    this.dailyWsListeners.add(listener);
+
+    // Start the WebSocket connection when the first listener subscribes
+    if (this.dailyWsListeners.size === 1) {
+      this.startDailyWs();
+    }
+
+    return () => {
+      this.dailyWsListeners.delete(listener);
+      // Stop the WS when no listeners remain
+      if (this.dailyWsListeners.size === 0) {
+        this.stopDailyWs();
+      }
+    };
+  }
+
+  // Internal: start the daily questions WebSocket
+  private startDailyWs() {
+    if (this.dailyWs) return; // already running
+
+    try {
+      this.getToken().then((token) => {
+        const base = API_CONFIG.BASE_URL || '';
+        if (!base) {
+          console.warn('[API] Cannot start WS: API base URL not set');
+          return;
+        }
+
+        // Convert http(s) to ws(s)
+        const wsBase = base.replace(/^http/, 'ws');
+        const wsPath = API_CONFIG.ENDPOINTS.WS_DAILY_QUESTIONS || '/ws/dailyquestions';
+        // backend expects the token as access_token query param
+        const tokenQuery = token ? `?access_token=${encodeURIComponent(token)}` : '';
+        const url = `${wsBase}${wsPath}${tokenQuery}`;
+
+        console.log('[API] Starting daily questions WS at:', url);
+
+        try {
+          this.dailyWs = new WebSocket(url);
+        } catch (err) {
+          console.error('[API] WebSocket constructor failed:', err);
+          this.scheduleDailyWsReconnect();
+          return;
+        }
+
+        this.dailyWs.onopen = () => {
+          console.log('[API] Daily questions WS connected');
+          this.dailyWsReconnectAttempts = 0;
+
+          // start heartbeat ping every 30s
+          try {
+            if (this.dailyWsPingIntervalId) {
+              clearInterval(this.dailyWsPingIntervalId);
+              this.dailyWsPingIntervalId = null;
+            }
+            this.dailyWsPingIntervalId = window.setInterval(() => {
+              try {
+                if (this.dailyWs && this.dailyWs.readyState === WebSocket.OPEN) {
+                  this.dailyWs.send(JSON.stringify({ type: 'ping' }));
+                }
+              } catch (err) {
+                console.error('[API] Error sending WS ping:', err);
+              }
+            }, 30000);
+          } catch (err) {
+            console.error('[API] Failed to start WS ping interval:', err);
+          }
+        };
+
+        this.dailyWs.onmessage = async (ev) => {
+          try {
+            const data = JSON.parse(ev.data as string);
+            if (!data) return;
+
+            // Backend message types: 'connected', 'daily_questions_ready', 'pong'
+            if (data.type === 'connected') {
+              console.log('[API] Daily WS connected confirmation:', data.message ?? data);
+              return;
+            }
+
+            if (data.type === 'daily_questions_ready') {
+              console.log('[API] Daily questions ready notification received');
+              // Fetch the latest daily questions from the API and broadcast to listeners
+              try {
+                const items = await this.getDailyQuestions();
+                this.broadcastDailyQuestions(items);
+              } catch (err) {
+                console.error('[API] Failed to fetch daily questions after WS notification:', err);
+              }
+
+              return;
+            }
+
+            if (data.type === 'pong') {
+              // keep-alive response
+              return;
+            }
+
+            // Support a direct payload containing items (for future compatibility)
+            if (Array.isArray(data)) {
+              this.broadcastDailyQuestions(data as DailyQuestion[]);
+            } else if (data.items && Array.isArray(data.items)) {
+              this.broadcastDailyQuestions(data.items as DailyQuestion[]);
+            } else {
+              console.debug('[API] Unrecognized WS message:', data);
+            }
+          } catch (err) {
+            console.error('[API] Error parsing WS message:', err);
+          }
+        };
+
+        this.dailyWs.onerror = (ev) => {
+          console.error('[API] Daily questions WS error:', ev);
+        };
+
+        this.dailyWs.onclose = (ev) => {
+          console.warn('[API] Daily questions WS closed', ev.code, ev.reason);
+          this.dailyWs = null;
+          // clear heartbeat
+          if (this.dailyWsPingIntervalId) {
+            clearInterval(this.dailyWsPingIntervalId);
+            this.dailyWsPingIntervalId = null;
+          }
+          this.scheduleDailyWsReconnect();
+        };
+      }).catch(err => {
+        console.error('[API] Failed to get token for WS:', err);
+        this.scheduleDailyWsReconnect();
+      });
+    } catch (err) {
+      console.error('[API] startDailyWs error:', err);
+      this.scheduleDailyWsReconnect();
+    }
+  }
+
+  private broadcastDailyQuestions(items: DailyQuestion[]) {
+    if (this.dailyWsListeners.size === 0) return;
+    for (const l of Array.from(this.dailyWsListeners)) {
+      try {
+        l(items);
+      } catch (err) {
+        console.error('[API] Listener error while broadcasting daily questions:', err);
+      }
+    }
+  }
+
+  private scheduleDailyWsReconnect() {
+    if (this.dailyWsReconnectTimerId) return;
+
+    this.dailyWsReconnectAttempts += 1;
+    const base = 1000; // 1s
+    const max = 30000; // 30s
+    const exp = Math.min(max, base * Math.pow(2, this.dailyWsReconnectAttempts));
+    const delay = Math.floor(exp * (0.75 + Math.random() * 0.5));
+
+    console.log(`[API] Scheduling WS reconnect in ${delay}ms (attempt ${this.dailyWsReconnectAttempts})`);
+
+    this.dailyWsReconnectTimerId = window.setTimeout(() => {
+      this.dailyWsReconnectTimerId = null;
+      this.startDailyWs();
+    }, delay);
+  }
+
+  private stopDailyWs() {
+    if (this.dailyWs) {
+      try {
+        this.dailyWs.close();
+      } catch (err) {
+        console.error('[API] Error closing daily WS:', err);
+      }
+      this.dailyWs = null;
+    }
+
+    if (this.dailyWsReconnectTimerId) {
+      clearTimeout(this.dailyWsReconnectTimerId);
+      this.dailyWsReconnectTimerId = null;
+    }
+
+    if (this.dailyWsPingIntervalId) {
+      clearInterval(this.dailyWsPingIntervalId);
+      this.dailyWsPingIntervalId = null;
+    }
+
+    this.dailyWsReconnectAttempts = 0;
   }
 
   // Error handler
