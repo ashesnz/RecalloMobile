@@ -77,6 +77,28 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+## Configuring API_BASE_URL
+
+The app reads its API base URL from a single authoritative source. Recommended place to set it is in `app.json` under `expo.extra.API_BASE_URL` so it's available to Expo/EAS builds.
+
+Example `app.json` snippet:
+
+```json
+{
+  "expo": {
+    "extra": {
+      "API_BASE_URL": "http://localhost:5298"
+    }
+  }
+}
+```
+
+Fallbacks and runtime
+
+- If `expo.extra.API_BASE_URL` is not present, the app will fall back to the environment variable `API_BASE_URL` (useful for CI or local bundler overrides).
+- At runtime the value is exposed as `API_CONFIG.BASE_URL` in `constants/api.ts` and can be updated with `setApiBaseUrl(url)`.
+- In development, if no value is provided a console warning will be shown.
+
 ## Future Enhancements
 
 - [ ] Actual audio recording with expo-av
@@ -92,4 +114,3 @@ To learn more about developing your project with Expo, look at the following res
 
 - [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
 - [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
