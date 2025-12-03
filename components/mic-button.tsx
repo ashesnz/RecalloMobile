@@ -47,7 +47,7 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
     };
   }, []);
 
-  const handlePressIn = async () => {
+  const startRecording = async () => {
     try {
       console.log('[MicButton] Starting recording...');
 
@@ -79,7 +79,7 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
     }
   };
 
-  const handlePressOut = async () => {
+  const stopRecording = async () => {
     try {
       if (!recording) return;
 
@@ -126,12 +126,20 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
     }
   };
 
+  const handlePress = async () => {
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
+  };
+
   const isProcessing = isRecording || isTranscribing;
   const statusText = isTranscribing
     ? 'Transcribing...'
     : isRecording
-      ? 'Recording... Release to stop'
-      : 'Hold to record your answer';
+      ? 'Tap again to finish recording'
+      : 'Tap to record your answer';
 
   return (
     <View style={styles.container}>
@@ -141,8 +149,7 @@ export function MicButton({ onRecordingStart, onRecordingEnd, onTranscriptUpdate
 
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <Pressable
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
+          onPress={handlePress}
           disabled={isTranscribing}
           style={[
             styles.micButton,

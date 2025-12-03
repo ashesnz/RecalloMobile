@@ -24,3 +24,17 @@ export interface QuestionResult {
   feedback: string;
 }
 
+export interface TranscriptionResponse {
+  transcript: string;
+}
+
+export interface EvaluationResponse {
+  questionId: string;
+  transcript: string;
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  score: number;
+  feedback: string;
+  correctAnswer?: string;
+}
+
+

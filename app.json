@@ -9,6 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.ashesnz.recallomobile",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone for voice input."
+      },
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {

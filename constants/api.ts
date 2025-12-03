@@ -30,6 +30,8 @@ export const API_CONFIG = {
     USER_PROFILE_UPDATE: '/api/users/me',
     PROJECTS: '/api/projects',
     DAILY_QUESTIONS: '/api/dailyquestions',
+    TRANSCRIBE_AUDIO: '/api/audio/transcribe',
+    EVALUATE_ANSWER: '/api/questions/evaluate',
   },
 };
 

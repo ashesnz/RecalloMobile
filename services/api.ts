@@ -210,6 +210,83 @@ class ApiService {
     }
   }
 
+  // Audio transcription endpoint - sends audio to backend for Whisper processing
+  async transcribeAudio(audioUri: string): Promise<string> {
+    try {
+      console.log('[API] Transcribing audio via backend:', audioUri);
+
+      const formData = new FormData();
+
+      // Determine the correct MIME type based on the file extension
+      const fileExtension = audioUri.split('.').pop()?.toLowerCase();
+      let mimeType = 'audio/m4a'; // Default for iOS
+
+      if (fileExtension === 'wav') {
+        mimeType = 'audio/wav';
+      } else if (fileExtension === 'mp3') {
+        mimeType = 'audio/mpeg';
+      } else if (fileExtension === 'webm') {
+        mimeType = 'audio/webm';
+      }
+
+      // Create file object for upload
+      const file = {
+        uri: Platform.OS === 'android' ? audioUri : audioUri.replace('file://', ''),
+        type: mimeType,
+        name: `recording.${fileExtension || 'm4a'}`,
+      } as any;
+
+      formData.append('file', file);
+
+      const response = await this.api.post<{ transcript: string }>(
+        API_CONFIG.ENDPOINTS.TRANSCRIBE_AUDIO,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000, // 30 seconds for audio processing
+        }
+      );
+
+      console.log('[API] Transcription complete:', response.data.transcript);
+      return response.data.transcript;
+    } catch (error) {
+      console.error('Transcribe audio error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  // Evaluate answer - sends question and transcript to backend for grading
+  async evaluateAnswer(questionId: string, questionText: string, transcript: string): Promise<{
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    score: number;
+    feedback: string;
+    correctAnswer?: string;
+  }> {
+    try {
+      console.log('[API] Evaluating answer for question:', questionId);
+
+      const response = await this.api.post(
+        API_CONFIG.ENDPOINTS.EVALUATE_ANSWER,
+        {
+          questionId,
+          questionText,
+          userAnswer: transcript,
+        },
+        {
+          timeout: 30000, // 30 seconds for AI evaluation
+        }
+      );
+
+      console.log('[API] Evaluation complete:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Evaluate answer error:', error);
+      throw this.handleError(error);
+    }
+  }
+
   // New: allow updating base URL at runtime
   setBaseUrl(url: string) {
     if (!url) return;

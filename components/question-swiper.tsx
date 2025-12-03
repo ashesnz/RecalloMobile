@@ -6,11 +6,14 @@ import {
   Dimensions,
   FlatList,
   ViewToken,
+  ActivityIndicator,
 } from 'react-native';
 import { SpeechBubble } from '@/components/speech-bubble';
 import { MicButton } from '@/components/mic-button';
-import { Question, QuestionResponse } from '@/types/question';
+import { Question, QuestionResponse, EvaluationResponse } from '@/types/question';
 import { Colors } from '@/constants/theme';
+import { apiService } from '@/services/api';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -20,9 +23,13 @@ interface QuestionSwiperProps {
 }
 
 export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<QuestionResponse[]>([]);
+  const [evaluations, setEvaluations] = useState<Map<string, EvaluationResponse>>(new Map());
   const [isRecording, setIsRecording] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const recordingStartTime = useRef<number>(0);
@@ -56,8 +63,37 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
     console.log('Recording started for question:', questions[currentIndex].id);
   };
 
-  const handleTranscriptUpdate = (transcript: string) => {
+  const handleTranscriptUpdate = async (transcript: string) => {
     setCurrentTranscript(transcript);
+
+    // Evaluate the answer immediately after transcription
+    if (transcript.trim()) {
+      setIsEvaluating(true);
+      try {
+        const currentQuestion = questions[currentIndex];
+        console.log('[QuestionSwiper] Evaluating answer for:', currentQuestion.id);
+
+        const evaluation = await apiService.evaluateAnswer(
+          currentQuestion.id,
+          currentQuestion.text,
+          transcript
+        );
+
+        // Store the evaluation result
+        setEvaluations(prev => new Map(prev).set(currentQuestion.id, {
+          questionId: currentQuestion.id,
+          transcript,
+          ...evaluation,
+        }));
+
+        console.log('[QuestionSwiper] Evaluation complete:', evaluation);
+      } catch (error) {
+        console.error('[QuestionSwiper] Evaluation error:', error);
+        // Still save the transcript even if evaluation fails
+      } finally {
+        setIsEvaluating(false);
+      }
+    }
   };
 
   const handleRecordingEnd = () => {
@@ -88,11 +124,16 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
       return (
         <View style={styles.questionContainer}>
           <View style={styles.contentWrapper}>
-            <Text style={styles.completionText}>Processing your answers...</Text>
+            <Text style={[styles.completionText, { color: colors.text }]}>
+              Processing your answers...
+            </Text>
           </View>
         </View>
       );
     }
+
+    const evaluation = evaluations.get(item.id);
+    const isCurrentQuestion = index === currentIndex;
 
     return (
       <View style={styles.questionContainer}>
@@ -103,31 +144,84 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
             totalQuestions={questions.length}
           />
 
-          {/* Transcript display area: show saved transcript for the question, or live transcript while recording */}
+          {/* Transcript display area */}
           {(() => {
             const saved = responses.find(r => r.questionId === item.id)?.transcript;
-            const showLive = index === currentIndex && currentTranscript && currentTranscript.trim().length > 0;
+            const showLive = isCurrentQuestion && currentTranscript && currentTranscript.trim().length > 0;
 
             if (showLive) {
               return (
-                <View style={styles.transcriptContainer}>
-                  <Text style={styles.transcriptLabel}>Your answer (live):</Text>
-                  <Text style={styles.transcriptText}>{currentTranscript}</Text>
+                <View style={[styles.transcriptContainer, {
+                  backgroundColor: colors.card,
+                  borderColor: colors.primary,
+                }]}>
+                  <Text style={[styles.transcriptLabel, { color: colors.primary }]}>
+                    Your answer (live):
+                  </Text>
+                  <Text style={[styles.transcriptText, { color: colors.text }]}>
+                    {currentTranscript}
+                  </Text>
                 </View>
               );
             }
 
             if (saved && saved.trim().length > 0) {
               return (
-                <View style={styles.transcriptContainer}>
-                  <Text style={styles.transcriptLabel}>Your answer:</Text>
-                  <Text style={styles.transcriptText}>{saved}</Text>
+                <View style={[styles.transcriptContainer, {
+                  backgroundColor: colors.card,
+                  borderColor: colors.primary,
+                }]}>
+                  <Text style={[styles.transcriptLabel, { color: colors.primary }]}>
+                    Your answer:
+                  </Text>
+                  <Text style={[styles.transcriptText, { color: colors.text }]}>
+                    {saved}
+                  </Text>
                 </View>
               );
             }
 
             return null;
           })()}
+
+          {/* Evaluation feedback display */}
+          {isCurrentQuestion && isEvaluating && (
+            <View style={[styles.evaluationContainer, { backgroundColor: colors.card }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.evaluatingText, { color: colors.textSecondary }]}>
+                Evaluating your answer...
+              </Text>
+            </View>
+          )}
+
+          {evaluation && (
+            <View style={[styles.feedbackContainer, {
+              backgroundColor: colors.card,
+              borderColor: getGradeColor(evaluation.grade),
+            }]}>
+              <View style={styles.feedbackHeader}>
+                <Text style={[styles.gradeText, { color: getGradeColor(evaluation.grade) }]}>
+                  Grade: {evaluation.grade}
+                </Text>
+                <Text style={[styles.scoreText, { color: colors.textSecondary }]}>
+                  {evaluation.score}%
+                </Text>
+              </View>
+              <Text style={[styles.feedbackText, { color: colors.text }]}>
+                {evaluation.feedback}
+              </Text>
+              {evaluation.correctAnswer && (
+                <View style={[styles.correctAnswerContainer, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.correctAnswerLabel, { color: colors.textSecondary }]}>
+                    Expected answer:
+                  </Text>
+                  <Text style={[styles.correctAnswerText, { color: colors.text }]}>
+                    {evaluation.correctAnswer}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.micContainer}>
             <MicButton
@@ -145,14 +239,14 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
                   style={[
                     styles.dot,
                     {
-                      backgroundColor: idx === index ? Colors.primary : Colors.textLight,
+                      backgroundColor: idx === index ? colors.primary : colors.textSecondary,
                       opacity: idx === index ? 1 : 0.3,
                     },
                   ]}
                 />
               ))}
             </View>
-            <Text style={styles.swipeHint}>
+            <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
               {index < questions.length - 1 ? 'Swipe left for next question →' : 'Swipe left to finish →'}
             </Text>
           </View>
@@ -161,8 +255,19 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
     );
   };
 
+  const getGradeColor = (grade: 'A' | 'B' | 'C' | 'D' | 'F') => {
+    switch (grade) {
+      case 'A': return '#22c55e'; // green
+      case 'B': return '#3b82f6'; // blue
+      case 'C': return '#eab308'; // yellow
+      case 'D': return '#f97316'; // orange
+      case 'F': return '#ef4444'; // red
+      default: return colors.textSecondary;
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         ref={flatListRef}
         data={dataWithEnd}
@@ -189,7 +294,6 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   questionContainer: {
     width: SCREEN_WIDTH,
@@ -223,7 +327,6 @@ const styles = StyleSheet.create({
   },
   swipeHint: {
     fontSize: 14,
-    color: Colors.textLight,
     textAlign: 'center',
   },
   transcriptContainer: {
@@ -231,11 +334,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 20,
     padding: 16,
-    backgroundColor: Colors.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    shadowColor: Colors.black,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -247,19 +348,77 @@ const styles = StyleSheet.create({
   transcriptLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   transcriptText: {
     fontSize: 16,
-    color: Colors.text,
     lineHeight: 24,
   },
   completionText: {
     fontSize: 18,
-    color: Colors.text,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  evaluationContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  evaluatingText: {
+    fontSize: 14,
+  },
+  feedbackContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  feedbackHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  gradeText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  scoreText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  feedbackText: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  correctAnswerContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  correctAnswerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  correctAnswerText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
 });
