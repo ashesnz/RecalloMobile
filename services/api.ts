@@ -8,8 +8,6 @@ import { Project } from '@/types/project';
 import { DailyQuestion } from '@/types/question';
 
 const TOKEN_KEY = 'auth_token';
-
-// Use SecureStore on native platforms, localStorage on web
 const isWeb = Platform.OS === 'web';
 
 interface StoredAuth {

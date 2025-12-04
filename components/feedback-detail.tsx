@@ -35,6 +35,7 @@ export function FeedbackDetail({ result, questionNumber, onClose }: FeedbackDeta
   };
 
   const gradeColor = getGradeColor(result.grade);
+  const isNotAnswered = result.feedback === 'N/A - Question skipped' || result.feedback === 'N/A - Question not answered';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -52,11 +53,13 @@ export function FeedbackDetail({ result, questionNumber, onClose }: FeedbackDeta
         {/* Grade Card */}
         <View style={[styles.gradeCard, { backgroundColor: colors.card, borderColor: gradeColor }]}>
           <View style={[styles.gradeCircle, { backgroundColor: gradeColor }]}>
-            <Text style={styles.gradeText}>{result.grade}</Text>
+            <Text style={styles.gradeText}>{isNotAnswered ? 'N/A' : result.grade}</Text>
           </View>
-          <Text style={[styles.scoreText, { color: gradeColor }]}>
-            {result.score}%
-          </Text>
+          {!isNotAnswered && (
+            <Text style={[styles.scoreText, { color: gradeColor }]}>
+              {result.score}%
+            </Text>
+          )}
         </View>
 
         {/* Question */}
@@ -81,27 +84,55 @@ export function FeedbackDetail({ result, questionNumber, onClose }: FeedbackDeta
           </View>
         </View>
 
-        {/* Performance Indicators */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ChartIcon size="md" variant="primary" />
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
-          </View>
-          <View style={styles.performanceContainer}>
-            <View style={styles.performanceItem}>
-              <Text style={[styles.performanceLabel, { color: colors.textSecondary }]}>Grade</Text>
-              <View style={[styles.performanceValue, { backgroundColor: gradeColor }]}>
-                <Text style={styles.performanceValueText}>{result.grade}</Text>
-              </View>
+        {/* User Answer - only show if answered */}
+        {!isNotAnswered && result.userAnswer && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ChatIcon size="md" variant="primary" />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Answer</Text>
             </View>
-            <View style={styles.performanceItem}>
-              <Text style={[styles.performanceLabel, { color: colors.textSecondary }]}>Score</Text>
-              <View style={[styles.performanceValue, { backgroundColor: gradeColor }]}>
-                <Text style={styles.performanceValueText}>{result.score}%</Text>
-              </View>
+            <View style={[styles.answerBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.answerText, { color: colors.text }]}>{result.userAnswer}</Text>
             </View>
           </View>
-        </View>
+        )}
+
+        {/* Correct Answer - only show if answered and available */}
+        {!isNotAnswered && result.correctAnswer && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <HelpIcon size="md" variant="primary" />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Expected Answer</Text>
+            </View>
+            <View style={[styles.answerBox, { backgroundColor: colors.card, borderColor: colors.primary }]}>
+              <Text style={[styles.answerText, { color: colors.text }]}>{result.correctAnswer}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Performance Indicators - hide for N/A */}
+        {!isNotAnswered && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ChartIcon size="md" variant="primary" />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Performance</Text>
+            </View>
+            <View style={styles.performanceContainer}>
+              <View style={styles.performanceItem}>
+                <Text style={[styles.performanceLabel, { color: colors.textSecondary }]}>Grade</Text>
+                <View style={[styles.performanceValue, { backgroundColor: gradeColor }]}>
+                  <Text style={styles.performanceValueText}>{result.grade}</Text>
+                </View>
+              </View>
+              <View style={styles.performanceItem}>
+                <Text style={[styles.performanceLabel, { color: colors.textSecondary }]}>Score</Text>
+                <View style={[styles.performanceValue, { backgroundColor: gradeColor }]}>
+                  <Text style={styles.performanceValueText}>{result.score}%</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -186,6 +217,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   feedbackText: {
+    fontSize: Typography.fontSize.base,
+    lineHeight: Typography.fontSize.base * Typography.lineHeight.normal,
+  },
+  answerBox: {
+    padding: Spacing.base,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  answerText: {
     fontSize: Typography.fontSize.base,
     lineHeight: Typography.fontSize.base * Typography.lineHeight.normal,
   },

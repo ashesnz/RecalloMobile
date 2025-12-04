@@ -51,43 +51,51 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
               </Text>
             </View>
           ) : (
-            results.map((result, index) => (
-            <Pressable
-              key={result.questionId}
-              style={({ pressed }) => [
-                styles.resultCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-              onPress={() => onQuestionPress(result)}
-            >
-              <View style={styles.resultHeader}>
-                <View style={styles.resultHeaderLeft}>
-                  <Text style={[styles.questionNumber, { color: colors.text }]}>Q{index + 1}</Text>
-                  <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(result.grade) }]}>
-                    <Text style={styles.gradeBadgeText}>{result.grade}</Text>
+            results.map((result, index) => {
+              const isNotAnswered = result.feedback === 'N/A - Question skipped' || result.feedback === 'N/A - Question not answered';
+
+              return (
+                <Pressable
+                  key={result.questionId}
+                  style={({ pressed }) => [
+                    styles.resultCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
+                  onPress={() => onQuestionPress(result)}
+                >
+                  <View style={styles.resultHeader}>
+                    <View style={styles.resultHeaderLeft}>
+                      <Text style={[styles.questionNumber, { color: colors.text }]}>Q{index + 1}</Text>
+                      <View style={[styles.gradeBadge, { backgroundColor: getGradeColor(result.grade) }]}>
+                        <Text style={styles.gradeBadgeText}>
+                          {isNotAnswered ? 'N/A' : result.grade}
+                        </Text>
+                      </View>
+                    </View>
+                    {!isNotAnswered && (
+                      <Text style={[styles.scoreLabel, { color: getGradeColor(result.grade) }]}>
+                        {result.score}%
+                      </Text>
+                    )}
                   </View>
-                </View>
-                <Text style={[styles.scoreLabel, { color: getGradeColor(result.grade) }]}>
-                  {result.score}%
-                </Text>
-              </View>
 
-              <Text style={[styles.questionText, { color: colors.textSecondary }]} numberOfLines={2}>
-                {result.question}
-              </Text>
+                  <Text style={[styles.questionText, { color: colors.text }]} numberOfLines={2}>
+                    {result.question}
+                  </Text>
 
-              <View style={styles.feedbackPreview}>
-                <ChatIcon size="xs" variant="textSecondary" />
-                <Text style={[styles.feedbackText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  Tap to view feedback
-                </Text>
-              </View>
-            </Pressable>
-          ))
+                  <View style={styles.feedbackPreview}>
+                    <ChatIcon size="xs" variant="textSecondary" />
+                    <Text style={[styles.feedbackText, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {isNotAnswered ? result.feedback : 'Tap to view feedback'}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })
           )}
         </View>
 

@@ -7,6 +7,7 @@ import {
   FlatList,
   ViewToken,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SpeechBubble } from '@/components/speech-bubble';
 import { MicButton } from '@/components/mic-button';
@@ -19,7 +20,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface QuestionSwiperProps {
   questions: Question[];
-  onComplete: (responses: QuestionResponse[]) => void;
+  onComplete: (responses: QuestionResponse[], evaluations: Map<string, EvaluationResponse>) => void;
 }
 
 export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
@@ -28,13 +29,14 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<QuestionResponse[]>([]);
   const [evaluations, setEvaluations] = useState<Map<string, EvaluationResponse>>(new Map());
+  const [notSureQuestions, setNotSureQuestions] = useState<Set<string>>(new Set());
   const [isRecording, setIsRecording] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState('');
+  const [canSwipe, setCanSwipe] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const recordingStartTime = useRef<number>(0);
 
-  // Add a completion marker item at the end
   const dataWithEnd = [...questions, { id: '__completion__', text: '' } as Question];
 
   const onViewableItemsChanged = useRef(
@@ -44,7 +46,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
         // Check if we've reached the completion marker
         if (newIndex >= questions.length) {
-          onComplete(responses);
+          onComplete(responses, evaluations);
           return;
         }
 
@@ -52,6 +54,12 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
         // Clear transcript when moving to a new question
         setCurrentTranscript('');
+
+        // Check if the new question has already been answered or marked as "Not Sure"
+        const newQuestion = questions[newIndex];
+        const hasEvaluation = evaluations.has(newQuestion.id);
+        const isNotSure = notSureQuestions.has(newQuestion.id);
+        setCanSwipe(hasEvaluation || isNotSure);
       }
     }
   ).current;
@@ -86,6 +94,9 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
           ...evaluation,
         }));
 
+        // Enable swiping after evaluation completes
+        setCanSwipe(true);
+
         console.log('[QuestionSwiper] Evaluation complete:', evaluation);
       } catch (error) {
         console.error('[QuestionSwiper] Evaluation error:', error);
@@ -116,6 +127,44 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
     }
 
     // No auto-advance - user must swipe to next question
+  };
+
+  const handleNotSure = () => {
+    const currentQuestion = questions[currentIndex];
+    console.log('[QuestionSwiper] User marked as Not Sure:', currentQuestion.id);
+
+    // Add to not sure set
+    setNotSureQuestions(prev => new Set(prev).add(currentQuestion.id));
+
+    // Create N/A evaluation
+    const naEvaluation: EvaluationResponse = {
+      questionId: currentQuestion.id,
+      transcript: '',
+      grade: 'F',
+      score: 0,
+      feedback: 'N/A - Question skipped',
+      correctAnswer: currentQuestion.text, // Show the question as reference
+    };
+
+    setEvaluations(prev => new Map(prev).set(currentQuestion.id, naEvaluation));
+
+    // Save response with N/A
+    const naResponse: QuestionResponse = {
+      questionId: currentQuestion.id,
+      transcript: 'Not Sure',
+    };
+
+    const updatedResponses = [
+      ...responses.filter(r => r.questionId !== currentQuestion.id),
+      naResponse,
+    ];
+    setResponses(updatedResponses);
+
+    // Enable swiping
+    setCanSwipe(true);
+
+    // Clear any current transcript
+    setCurrentTranscript('');
   };
 
   const renderQuestion = ({ item, index }: { item: Question; index: number }) => {
@@ -201,16 +250,18 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
             }]}>
               <View style={styles.feedbackHeader}>
                 <Text style={[styles.gradeText, { color: getGradeColor(evaluation.grade) }]}>
-                  Grade: {evaluation.grade}
+                  {evaluation.feedback === 'N/A - Question skipped' ? 'N/A' : `Grade: ${evaluation.grade}`}
                 </Text>
-                <Text style={[styles.scoreText, { color: colors.textSecondary }]}>
-                  {evaluation.score}%
-                </Text>
+                {evaluation.feedback !== 'N/A - Question skipped' && (
+                  <Text style={[styles.scoreText, { color: colors.textSecondary }]}>
+                    {evaluation.score}%
+                  </Text>
+                )}
               </View>
               <Text style={[styles.feedbackText, { color: colors.text }]}>
                 {evaluation.feedback}
               </Text>
-              {evaluation.correctAnswer && (
+              {evaluation.correctAnswer && evaluation.feedback !== 'N/A - Question skipped' && (
                 <View style={[styles.correctAnswerContainer, { borderTopColor: colors.border }]}>
                   <Text style={[styles.correctAnswerLabel, { color: colors.textSecondary }]}>
                     Expected answer:
@@ -231,6 +282,27 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
             />
           </View>
 
+          {/* Not Sure Button */}
+          {isCurrentQuestion && !evaluation && !isEvaluating && (
+            <View style={styles.notSureContainer}>
+              <TouchableOpacity
+                style={[styles.notSureButton, {
+                  backgroundColor: colors.card,
+                  borderColor: colors.textSecondary,
+                }]}
+                onPress={handleNotSure}
+                disabled={isRecording}
+              >
+                <Text style={[styles.notSureButtonText, {
+                  color: colors.textSecondary,
+                  opacity: isRecording ? 0.5 : 1,
+                }]}>
+                  Not Sure
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.progressContainer}>
             <View style={styles.progressDots}>
               {questions.map((_, idx) => (
@@ -246,9 +318,11 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
                 />
               ))}
             </View>
-            <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
-              {index < questions.length - 1 ? 'Swipe left for next question →' : 'Swipe left to finish →'}
-            </Text>
+            {isCurrentQuestion && canSwipe && (
+              <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
+                {index < questions.length - 1 ? 'Swipe left for next question →' : 'Swipe left to finish →'}
+              </Text>
+            )}
           </View>
         </View>
       </View>
@@ -280,7 +354,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
         viewabilityConfig={{
           itemVisiblePercentThreshold: 50,
         }}
-        scrollEnabled={!isRecording}
+        scrollEnabled={!isRecording && canSwipe}
         getItemLayout={(_, index) => ({
           length: SCREEN_WIDTH,
           offset: SCREEN_WIDTH * index,
@@ -420,5 +494,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     fontStyle: 'italic',
+  },
+  notSureContainer: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  notSureButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  notSureButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

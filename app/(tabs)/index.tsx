@@ -117,49 +117,45 @@ export function HomeScreen() {
     setAppState('dashboard');
   };
 
-  const handleQuestionsComplete = (_completedResponses: QuestionResponse[]) => {
-    console.log('[HomeScreen] Questions complete, generating mock results for backend questions');
+  const handleQuestionsComplete = (_completedResponses: QuestionResponse[], evaluations: Map<string, import('@/types/question').EvaluationResponse>) => {
+    console.log('[HomeScreen] Questions complete, processing evaluations');
     console.log('[HomeScreen] Daily questions available:', dailyQuestions.length);
+    console.log('[HomeScreen] Evaluations received:', evaluations.size);
 
-    // Mock grading data - cycle through these for each question
-    const mockGradingData = [
-      {
-        grade: 'B' as const,
-        score: 73,
-        feedback: 'Good answer! You provided relevant points, but could have elaborated more on specific examples. Your reasoning was clear, though adding more depth would strengthen your response. Consider providing concrete scenarios to illustrate your points better.',
-      },
-      {
-        grade: 'A' as const,
-        score: 80,
-        feedback: 'Excellent response! You demonstrated strong understanding and communicated your ideas effectively. Your answer was well-structured and showed clear thought process. The examples you provided were relevant and helped illustrate your main points perfectly.',
-      },
-      {
-        grade: 'B' as const,
-        score: 65,
-        feedback: 'Solid answer with good foundational knowledge. You covered the main points adequately, but there\'s room for improvement in terms of detail and specificity. Try to provide more concrete examples and explain your reasoning more thoroughly next time.',
-      },
-    ];
+    // Convert evaluations to results
+    const results = dailyQuestions.map((dailyQuestion) => {
+      const evaluation = evaluations.get(dailyQuestion.id);
 
-    // Generate mock results from all backend daily questions
-    const mockResults = dailyQuestions.map((dailyQuestion, index) => {
-      const gradingData = mockGradingData[index % mockGradingData.length];
+      if (!evaluation) {
+        // This shouldn't happen, but handle it just in case
+        console.warn(`[HomeScreen] No evaluation found for question ${dailyQuestion.id}`);
+        return {
+          questionId: dailyQuestion.id,
+          question: dailyQuestion.question,
+          grade: 'F' as const,
+          score: 0,
+          feedback: 'N/A - Question not answered',
+          userAnswer: '',
+          correctAnswer: dailyQuestion.answer,
+        };
+      }
 
-      console.log(`[HomeScreen] Creating result ${index + 1}:`, {
-        questionId: dailyQuestion.id,
-        question: dailyQuestion.question,
-      });
+      // Check if this was a "Not Sure" answer
+      const isNotSure = evaluation.feedback === 'N/A - Question skipped';
 
       return {
         questionId: dailyQuestion.id,
         question: dailyQuestion.question,
-        grade: gradingData.grade,
-        score: gradingData.score,
-        feedback: gradingData.feedback,
+        grade: evaluation.grade,
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        userAnswer: isNotSure ? '' : evaluation.transcript,
+        correctAnswer: isNotSure ? undefined : evaluation.correctAnswer,
       };
     });
 
-    console.log('[HomeScreen] Generated mock results:', mockResults.length);
-    setResults(mockResults);
+    console.log('[HomeScreen] Generated results:', results.length);
+    setResults(results);
     setAppState('results');
   };
 

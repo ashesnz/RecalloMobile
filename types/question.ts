@@ -22,6 +22,8 @@ export interface QuestionResult {
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
   score: number; // 0-100
   feedback: string;
+  userAnswer?: string;
+  correctAnswer?: string | null;
 }
 
 export interface TranscriptionResponse {
