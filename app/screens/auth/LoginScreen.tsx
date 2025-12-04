@@ -22,7 +22,7 @@ import { useAuth } from '@/hooks/use-auth';
  * - Clears auth errors on unmount
  * - Preserves email on failed login (only clears password)
  */
-export function LoginScreen() {
+function LoginScreen() {
   const { login, isLoggingIn, error: authError, clearError } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -285,3 +285,4 @@ const styles = StyleSheet.create({
   },
 });
 
+export default LoginScreen;

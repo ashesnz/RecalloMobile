@@ -176,3 +176,5 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 });
+
+export default SettingsScreen;
