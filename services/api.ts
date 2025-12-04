@@ -31,6 +31,7 @@ class ApiService {
   private dailyWsReconnectAttempts = 0;
   private dailyWsReconnectTimerId: number | null = null;
   private dailyWsPingIntervalId: number | null = null;
+  private shouldReconnectWs: boolean = true;
 
   private isRefreshing = false;
   private refreshPromise: Promise<void> | null = null;
@@ -586,6 +587,9 @@ class ApiService {
   private startDailyWs() {
     if (this.dailyWs) return; // already running
 
+    // Enable reconnection when starting
+    this.shouldReconnectWs = true;
+
     try {
       this.getToken().then(async (token) => {
         const base = API_CONFIG.BASE_URL || '';
@@ -597,8 +601,12 @@ class ApiService {
         // Don't attempt to connect if there's no token — server will 401
         if (!token) {
           console.warn('[API] No auth token available for WS; deferring WS start until token is present');
-          // schedule a reconnect attempt later (backoff)
-          this.scheduleDailyWsReconnect();
+          // Only schedule reconnect if we should reconnect and there are active listeners
+          if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+            this.scheduleDailyWsReconnect();
+          } else {
+            console.log('[API] Not scheduling WS reconnect (shouldReconnect:', this.shouldReconnectWs, 'listeners:', this.dailyWsListeners.size, ')');
+          }
           return;
         }
 
@@ -610,8 +618,10 @@ class ApiService {
           console.error('[API] Token validation failed before WS handshake:', err);
           // Broadcast a notification so UI can show a helpful message
           try { this.broadcastNotification({ type: 'ws_auth_failed', message: 'WebSocket auth failed (token invalid)' }); } catch {}
-          // schedule reconnect (will re-check token later)
-          this.scheduleDailyWsReconnect();
+          // Only schedule reconnect if we should reconnect and have listeners
+          if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+            this.scheduleDailyWsReconnect();
+          }
           return;
         }
 
@@ -657,7 +667,9 @@ class ApiService {
           this.dailyWs = new WebSocket(url);
         } catch (err) {
           console.error('[API] WebSocket constructor failed:', err);
-          this.scheduleDailyWsReconnect();
+          if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+            this.scheduleDailyWsReconnect();
+          }
           return;
         }
 
@@ -780,15 +792,24 @@ class ApiService {
              this.dailyWsParamIndex = (this.dailyWsParamIndex + 1) % this.dailyWsParamNames.length;
              console.warn('[API] WS handshake did not complete; will try next token param name:', this.dailyWsParamNames[this.dailyWsParamIndex]);
            }
-           this.scheduleDailyWsReconnect();
+           // Only reconnect if flag is set and we have listeners
+           if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+             this.scheduleDailyWsReconnect();
+           } else {
+             console.log('[API] Not scheduling WS reconnect after close (shouldReconnect:', this.shouldReconnectWs, 'listeners:', this.dailyWsListeners.size, ')');
+           }
          };
       }).catch(err => {
          console.error('[API] Failed to get token for WS:', err);
-         this.scheduleDailyWsReconnect();
+         if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+           this.scheduleDailyWsReconnect();
+         }
        });
      } catch (err) {
        console.error('[API] startDailyWs error:', err);
-       this.scheduleDailyWsReconnect();
+       if (this.shouldReconnectWs && this.dailyWsListeners.size > 0) {
+         this.scheduleDailyWsReconnect();
+       }
      }
    }
 
@@ -821,6 +842,10 @@ class ApiService {
   }
 
   private stopDailyWs() {
+    console.log('[API] Stopping daily WS');
+    // Disable reconnection
+    this.shouldReconnectWs = false;
+
     if (this.dailyWs) {
       try {
         this.dailyWs.close();

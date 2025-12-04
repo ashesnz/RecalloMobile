@@ -2,7 +2,6 @@ import { useEffect, ReactNode } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import Constants from 'expo-constants';
 import { apiService } from '@/services/api';
-import { whisperService } from '@/services/whisper-service';
 
 interface AuthInitializerProps {
   children: ReactNode;
