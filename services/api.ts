@@ -18,6 +18,8 @@ class ApiService {
   // Real-time daily questions WebSocket manager
   private dailyWs: WebSocket | null = null;
   private dailyWsListeners: Set<(items: DailyQuestion[]) => void> = new Set();
+  private dailyNotificationsListeners: Set<(n: { type: string; timestamp?: string; message?: string }) => void> = new Set();
+  private connectionStatusListeners: Set<(connected: boolean) => void> = new Set();
   private dailyWsReconnectAttempts = 0;
   private dailyWsReconnectTimerId: number | null = null;
   private dailyWsPingIntervalId: number | null = null; // heartbeat ping interval id
@@ -58,6 +60,52 @@ class ApiService {
         return Promise.reject(error);
       }
     );
+  }
+
+  // Subscribe to connection status changes. Returns an unsubscribe function.
+  subscribeConnectionStatus(listener: (connected: boolean) => void): () => void {
+    this.connectionStatusListeners.add(listener);
+    // If we have an active WS, immediately notify listener
+    try {
+      listener(!!(this.dailyWs && this.dailyWs.readyState === WebSocket.OPEN));
+    } catch (err) {
+      console.error('[API] Error invoking connection listener:', err);
+    }
+    return () => {
+      this.connectionStatusListeners.delete(listener);
+    };
+  }
+
+  private broadcastConnectionStatus(connected: boolean) {
+    if (this.connectionStatusListeners.size === 0) return;
+    for (const l of Array.from(this.connectionStatusListeners)) {
+      try {
+        l(connected);
+      } catch (err) {
+        console.error('[API] Connection listener error:', err);
+      }
+    }
+  }
+
+  // Subscribe to simple WebSocket notifications (connected, daily_questions_ready, etc.)
+  subscribeNotifications(listener: (n: { type: string; timestamp?: string; message?: string }) => void): () => void {
+    this.dailyNotificationsListeners.add(listener);
+
+    // Return unsubscribe
+    return () => {
+      this.dailyNotificationsListeners.delete(listener);
+    };
+  }
+
+  private broadcastNotification(n: { type: string; timestamp?: string; message?: string }) {
+    if (this.dailyNotificationsListeners.size === 0) return;
+    for (const l of Array.from(this.dailyNotificationsListeners)) {
+      try {
+        l(n);
+      } catch (err) {
+        console.error('[API] Notification listener error:', err);
+      }
+    }
   }
 
   // Token management
@@ -353,6 +401,13 @@ class ApiService {
           console.log('[API] Daily questions WS connected');
           this.dailyWsReconnectAttempts = 0;
 
+          // broadcast connection up
+          try {
+            this.broadcastConnectionStatus(true);
+          } catch (err) {
+            console.error('[API] Error broadcasting connection status:', err);
+          }
+
           // start heartbeat ping every 30s
           try {
             if (this.dailyWsPingIntervalId) {
@@ -381,26 +436,38 @@ class ApiService {
             // Backend message types: 'connected', 'daily_questions_ready', 'pong'
             if (data.type === 'connected') {
               console.log('[API] Daily WS connected confirmation:', data.message ?? data);
-              return;
-            }
-
-            if (data.type === 'daily_questions_ready') {
-              console.log('[API] Daily questions ready notification received');
-              // Fetch the latest daily questions from the API and broadcast to listeners
+              // broadcast lightweight connected notification
               try {
-                const items = await this.getDailyQuestions();
-                this.broadcastDailyQuestions(items);
+                this.broadcastNotification({ type: 'connected', timestamp: data.timestamp, message: data.message });
               } catch (err) {
-                console.error('[API] Failed to fetch daily questions after WS notification:', err);
+                console.error('[API] Error broadcasting connected notification:', err);
               }
+               return;
+             }
 
-              return;
-            }
+             if (data.type === 'daily_questions_ready') {
+               console.log('[API] Daily questions ready notification received');
+              // broadcast a lightweight notification first
+              try {
+                this.broadcastNotification({ type: 'daily_questions_ready', timestamp: data.timestamp });
+              } catch (err) {
+                console.error('[API] Error broadcasting daily_questions_ready notification:', err);
+              }
+               // Fetch the latest daily questions from the API and broadcast to listeners
+               try {
+                 const items = await this.getDailyQuestions();
+                 this.broadcastDailyQuestions(items);
+               } catch (err) {
+                 console.error('[API] Failed to fetch daily questions after WS notification:', err);
+               }
 
-            if (data.type === 'pong') {
-              // keep-alive response
-              return;
-            }
+               return;
+             }
+
+             if (data.type === 'pong') {
+               // keep-alive response
+               return;
+             }
 
             // Support a direct payload containing items (for future compatibility)
             if (Array.isArray(data)) {
@@ -426,6 +493,12 @@ class ApiService {
           if (this.dailyWsPingIntervalId) {
             clearInterval(this.dailyWsPingIntervalId);
             this.dailyWsPingIntervalId = null;
+          }
+          // broadcast connection down
+          try {
+            this.broadcastConnectionStatus(false);
+          } catch (err) {
+            console.error('[API] Error broadcasting connection status:', err);
           }
           this.scheduleDailyWsReconnect();
         };

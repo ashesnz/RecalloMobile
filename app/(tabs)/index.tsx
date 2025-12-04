@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/app/screens/results';
 import { FeedbackDetail } from '@/components/feedback-detail';
@@ -15,8 +15,11 @@ import { apiService } from '@/services/api';
 
 type AppState = 'dashboard' | 'questions' | 'results' | 'feedback' | 'settings';
 
-export default function HomeScreen() {
+export function HomeScreen() {
   const [appState, setAppState] = useState<AppState>('dashboard');
+  // persistent notification history (manual dismiss)
+  const [notifications, setNotifications] = useState<{ id: string; type: string; message?: string; timestamp?: string }[]>([]);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [results, setResults] = useState<QuestionResult[]>([]);
   const [selectedResult, setSelectedResult] = useState<QuestionResult | null>(null);
   const [questionSettings, setQuestionSettings] = useState<QuestionSettings | null>(null);
@@ -27,6 +30,25 @@ export default function HomeScreen() {
   // Load saved settings on mount
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  // Subscribe to lightweight WS notifications (connected / daily_questions_ready) and keep history
+  useEffect(() => {
+    const unsub = apiService.subscribeNotifications((n) => {
+      console.log('[HomeScreen] Received notification:', n);
+      const id = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      setNotifications(prev => [{ id, type: n.type, message: n.message, timestamp: n.timestamp }, ...prev]);
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Subscribe to connection status changes for indicator
+  useEffect(() => {
+    const unsub = apiService.subscribeConnectionStatus((connected) => {
+      setIsConnected(connected);
+    });
+    return () => unsub();
   }, []);
 
   // Poll for daily questions every 15 seconds
@@ -161,15 +183,41 @@ export default function HomeScreen() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <View style={styles.dashboardContainer}>
-          <Text style={styles.welcomeBack}>
-            {getPersonalizedGreeting(user?.name)}!
-          </Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.welcomeBack}>{getPersonalizedGreeting(user?.name)}!</Text>
+            <View style={[styles.connectionPill, isConnected ? styles.connected : styles.disconnected]}>
+              <Text style={styles.connectionText}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
+            </View>
+          </View>
 
           <DailyQuestionsWidget
             onPress={handleStartSession}
             questionCount={dailyQuestions.length}
             isLoading={isLoadingQuestions}
           />
+
+          {/* Persistent notifications history */}
+          {notifications.length > 0 && (
+            <View style={styles.notificationsList}>
+              <View style={styles.notificationsHeader}>
+                <Text style={styles.notificationsTitle}>Notifications</Text>
+                <TouchableOpacity onPress={() => setNotifications([])}>
+                  <Text style={styles.dismissAll}>Dismiss all</Text>
+                </TouchableOpacity>
+              </View>
+              {notifications.map(n => (
+                <View key={n.id} style={styles.notificationItem}>
+                  <Text style={styles.notificationTextSmall}>{n.type === 'daily_questions_ready' ? 'Daily questions ready' : n.message ?? n.type}</Text>
+                  <View style={styles.notificationActions}>
+                    <Text style={styles.notificationTime}>{n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}</Text>
+                    <TouchableOpacity onPress={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}>
+                      <Text style={styles.dismissText}>Dismiss</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
         </View>
       </ScrollView>
@@ -247,6 +295,70 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  connectionPill: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  connected: {
+    backgroundColor: '#e6ffed',
+  },
+  disconnected: {
+    backgroundColor: '#ffecec',
+  },
+  connectionText: {
+    color: '#0b723b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  notificationsList: {
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  notificationsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  notificationsTitle: {
+    fontWeight: '700',
+  },
+  dismissAll: {
+    color: '#7a4f01',
+    fontWeight: '600',
+  },
+  notificationItem: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  notificationTextSmall: {
+    color: '#333',
+  },
+  notificationActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  notificationTime: {
+    color: '#999',
+    fontSize: 12,
+  },
+  dismissText: {
+    color: '#d9534f',
+    fontWeight: '700',
+  },
   scrollContent: {
     flexGrow: 1,
   },
@@ -262,4 +374,19 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     paddingHorizontal: 20,
   },
+  notificationContainer: {
+    backgroundColor: '#e8f4ff',
+    borderColor: '#a7d3ff',
+    borderWidth: 1,
+    padding: 10,
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderRadius: 8,
+  },
+  notificationText: {
+    color: '#0b5394',
+    fontSize: 14,
+  },
 });
+
+export default HomeScreen;
