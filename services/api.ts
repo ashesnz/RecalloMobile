@@ -9,6 +9,8 @@ import { DailyQuestion } from '@/types/question';
 
 const TOKEN_KEY = 'auth_token';
 const isWeb = Platform.OS === 'web';
+const hasBrowserLocalStorage =
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 interface StoredAuth {
   accessToken: string;
@@ -283,8 +285,8 @@ class ApiService {
 
     try {
       const json = JSON.stringify(stored);
-      if (isWeb) {
-        localStorage.setItem(TOKEN_KEY, json);
+      if (hasBrowserLocalStorage) {
+        window.localStorage.setItem(TOKEN_KEY, json);
       } else {
         await SecureStore.setItemAsync(TOKEN_KEY, json);
       }
@@ -311,7 +313,9 @@ class ApiService {
 
   async getAuth(): Promise<StoredAuth | null> {
     try {
-      const raw = isWeb ? localStorage.getItem(TOKEN_KEY) : await SecureStore.getItemAsync(TOKEN_KEY);
+      const raw = hasBrowserLocalStorage
+        ? window.localStorage.getItem(TOKEN_KEY)
+        : await SecureStore.getItemAsync(TOKEN_KEY);
       if (!raw) return null;
       return JSON.parse(raw) as StoredAuth;
     } catch (error) {
@@ -332,8 +336,8 @@ class ApiService {
 
   async clearAuth(): Promise<void> {
     try {
-      if (isWeb) {
-        localStorage.removeItem(TOKEN_KEY);
+      if (hasBrowserLocalStorage) {
+        window.localStorage.removeItem(TOKEN_KEY);
       } else {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
       }
