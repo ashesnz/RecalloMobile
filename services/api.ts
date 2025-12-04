@@ -12,17 +12,29 @@ const TOKEN_KEY = 'auth_token';
 // Use SecureStore on native platforms, localStorage on web
 const isWeb = Platform.OS === 'web';
 
+interface StoredAuth {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string; // ISO string
+}
+
 class ApiService {
   private api: AxiosInstance;
+  private rawApi: AxiosInstance;
 
-  // Real-time daily questions WebSocket manager
   private dailyWs: WebSocket | null = null;
   private dailyWsListeners: Set<(items: DailyQuestion[]) => void> = new Set();
   private dailyNotificationsListeners: Set<(n: { type: string; timestamp?: string; message?: string }) => void> = new Set();
   private connectionStatusListeners: Set<(connected: boolean) => void> = new Set();
+  private dailyWsParamNames = ['access_token', 'token', 'accessToken'];
+  private dailyWsParamIndex = 0;
   private dailyWsReconnectAttempts = 0;
   private dailyWsReconnectTimerId: number | null = null;
-  private dailyWsPingIntervalId: number | null = null; // heartbeat ping interval id
+  private dailyWsPingIntervalId: number | null = null;
+
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
+  private tokenRefreshTimerId: number | null = null;
 
   constructor() {
     this.api = axios.create({
@@ -33,33 +45,187 @@ class ApiService {
       },
     });
 
+    // rawApi mirrors baseURL but has no interceptors – used for refresh calls
+    this.rawApi = axios.create({
+      baseURL: API_CONFIG.BASE_URL,
+      timeout: API_TIMEOUT,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
     console.log('[API] Initialized with baseURL:', API_CONFIG.BASE_URL);
 
-    // Request interceptor to add auth token
+    this.initializeTokenRefresh();
+
     this.api.interceptors.request.use(
       async (config) => {
-        const token = await this.getToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        const auth = await this.getAuth();
+        if (auth && auth.accessToken) {
+          try {
+            if (this.isTokenExpiringSoon(auth.expiresAt)) {
+              await this.refreshTokenIfNeeded();
+              const refreshed = await this.getAuth();
+              if (refreshed?.accessToken) {
+                config.headers = config.headers || {};
+                (config.headers as any).Authorization = `Bearer ${refreshed.accessToken}`;
+              }
+            } else {
+              config.headers = config.headers || {};
+              (config.headers as any).Authorization = `Bearer ${auth.accessToken}`;
+            }
+          } catch {
+            console.warn('[API] Proactive token refresh failed');
+          }
         }
-        // Log all outgoing requests for debugging
         console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling and refresh-on-401
     this.api.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
+        const originalRequest: any = (error.config as any) || {};
+
         if (error.response?.status === 401) {
-          // Token expired or invalid
-          await this.clearToken();
+          if (originalRequest._retry) {
+            await this.clearAuth();
+            return Promise.reject(error);
+          }
+
+          const auth = await this.getAuth();
+          if (auth?.refreshToken) {
+            try {
+              await this.refreshTokenIfNeeded();
+              const latest = await this.getAuth();
+              if (latest?.accessToken) {
+                originalRequest._retry = true;
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers.Authorization = `Bearer ${latest.accessToken}`;
+                return this.api.request(originalRequest);
+              }
+            } catch (refreshErr) {
+              console.warn('[API] Refresh failed after 401:', refreshErr);
+              await this.clearAuth();
+              return Promise.reject(error);
+            }
+          } else {
+            await this.clearAuth();
+          }
         }
+
         return Promise.reject(error);
       }
     );
+  }
+
+  private async initializeTokenRefresh() {
+    try {
+      const auth = await this.getAuth();
+      if (auth?.expiresAt && auth?.refreshToken) {
+        console.log('[API] Initializing token refresh timer');
+        this.scheduleTokenRefresh(auth.expiresAt);
+      }
+    } catch (err) {
+      console.error('[API] Error initializing token refresh:', err);
+    }
+  }
+
+  private isTokenExpiringSoon(expiresAt?: string | null, thresholdSeconds = 300) {
+    if (!expiresAt) return true;
+    try {
+      const exp = new Date(expiresAt);
+      const now = new Date();
+      const diff = (exp.getTime() - now.getTime()) / 1000;
+      return diff < thresholdSeconds;
+    } catch {
+      return true;
+    }
+  }
+
+  private async refreshTokenIfNeeded(): Promise<void> {
+    if (this.isRefreshing) {
+      if (this.refreshPromise) return this.refreshPromise;
+    }
+
+    const auth = await this.getAuth();
+    if (!auth?.refreshToken) {
+      console.warn('[API] No refresh token available');
+      throw new Error('No refresh token available');
+    }
+
+    if (!this.isTokenExpiringSoon(auth.expiresAt)) {
+      return;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        console.log('[API] Attempting token refresh');
+
+        const resp = await this.rawApi.post<AuthResponse>(API_CONFIG.ENDPOINTS.REFRESH_TOKEN, {
+          refreshToken: auth.refreshToken,
+        });
+
+        if (!resp?.data?.accessToken) {
+          console.error('[API] Invalid refresh response');
+          await this.clearAuth();
+          throw new Error('Invalid refresh response');
+        }
+
+        await this.saveAuth(resp.data);
+        console.log('[API] Token refresh succeeded, new expiry:', resp.data.expiresAt);
+
+        this.scheduleTokenRefresh(resp.data.expiresAt);
+
+        if (this.dailyWs && this.dailyWs.readyState === WebSocket.OPEN) {
+          console.log('[API] Reconnecting WebSocket with new token');
+          this.stopDailyWs();
+          this.startDailyWs();
+        }
+      } catch (err) {
+        console.error('[API] Token refresh error:', err);
+        await this.clearAuth();
+        throw err;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  private scheduleTokenRefresh(expiresAt: string) {
+    if (this.tokenRefreshTimerId) {
+      clearTimeout(this.tokenRefreshTimerId);
+      this.tokenRefreshTimerId = null;
+    }
+
+    try {
+      const exp = new Date(expiresAt);
+      const now = new Date();
+      const timeUntilExpiry = exp.getTime() - now.getTime();
+
+      const refreshBuffer = 5 * 60 * 1000;
+      const refreshTime = Math.max(0, timeUntilExpiry - refreshBuffer);
+
+      console.log(`[API] Scheduling token refresh in ${Math.round(refreshTime / 1000)}s`);
+
+      this.tokenRefreshTimerId = window.setTimeout(async () => {
+        this.tokenRefreshTimerId = null;
+        try {
+          await this.refreshTokenIfNeeded();
+        } catch (err) {
+          console.error('[API] Scheduled token refresh failed:', err);
+        }
+      }, refreshTime);
+    } catch (err) {
+      console.error('[API] Error scheduling token refresh:', err);
+    }
   }
 
   // Subscribe to connection status changes. Returns an unsubscribe function.
@@ -108,43 +274,90 @@ class ApiService {
     }
   }
 
-  // Token management
-  async saveToken(token: string): Promise<void> {
+  // Auth storage helpers
+  async saveAuth(auth: AuthResponse): Promise<void> {
+    const stored: StoredAuth = {
+      accessToken: auth.accessToken,
+      refreshToken: auth.refreshToken,
+      expiresAt: auth.expiresAt,
+    };
+
     try {
+      const json = JSON.stringify(stored);
       if (isWeb) {
-        localStorage.setItem(TOKEN_KEY, token);
+        localStorage.setItem(TOKEN_KEY, json);
       } else {
-        await SecureStore.setItemAsync(TOKEN_KEY, token);
+        await SecureStore.setItemAsync(TOKEN_KEY, json);
       }
+
+      console.log('[API] Auth saved; scheduling token refresh');
+      this.scheduleTokenRefresh(auth.expiresAt);
+
+      try {
+        if (this.dailyWs) {
+          console.log('[API] Restarting WebSocket with new token');
+          this.stopDailyWs();
+          this.startDailyWs();
+        }
+      } catch (err) {
+        console.error('[API] Error restarting WS after saving auth:', err);
+      }
+
+      return;
     } catch (error) {
-      console.error('Error saving token:', error);
+      console.error('Error saving auth:', error);
       throw error;
+    }
+  }
+
+  async getAuth(): Promise<StoredAuth | null> {
+    try {
+      const raw = isWeb ? localStorage.getItem(TOKEN_KEY) : await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw) as StoredAuth;
+    } catch (error) {
+      console.error('Error getting auth:', error);
+      return null;
     }
   }
 
   async getToken(): Promise<string | null> {
     try {
-      if (isWeb) {
-        return localStorage.getItem(TOKEN_KEY);
-      } else {
-        return await SecureStore.getItemAsync(TOKEN_KEY);
-      }
+      const auth = await this.getAuth();
+      return auth?.accessToken ?? null;
     } catch (error) {
       console.error('Error getting token:', error);
       return null;
     }
   }
 
-  async clearToken(): Promise<void> {
+  async clearAuth(): Promise<void> {
     try {
       if (isWeb) {
         localStorage.removeItem(TOKEN_KEY);
       } else {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
       }
+
+      if (this.tokenRefreshTimerId) {
+        clearTimeout(this.tokenRefreshTimerId);
+        this.tokenRefreshTimerId = null;
+      }
+
+      console.log('[API] Auth cleared; stopping WS');
+      try {
+        this.stopDailyWs();
+      } catch (err) {
+        console.error('[API] Error stopping WS after clearing auth:', err);
+      }
+      return;
     } catch (error) {
-      console.error('Error clearing token:', error);
+      console.error('Error clearing auth:', error);
     }
+  }
+
+  async clearToken(): Promise<void> {
+    return this.clearAuth();
   }
 
   // Auth endpoints
@@ -160,8 +373,8 @@ class ApiService {
       console.log('[API] AccessToken:', response.data.accessToken ? 'exists' : 'missing');
 
       if (response.data.accessToken) {
-        await this.saveToken(response.data.accessToken);
-        console.log('[API] Token saved to secure storage');
+        await this.saveAuth(response.data);
+        console.log('[API] Auth saved to secure storage');
       }
 
       return response.data;
@@ -179,7 +392,7 @@ class ApiService {
       );
 
       if (response.data.accessToken) {
-        await this.saveToken(response.data.accessToken);
+        await this.saveAuth(response.data);
       }
 
       return response.data;
@@ -191,8 +404,8 @@ class ApiService {
 
   async logout(): Promise<void> {
     console.log('[API] Logout started');
-    const token = await this.getToken();
-    console.log('[API] Token exists before logout:', token ? 'YES' : 'NO');
+    const auth = await this.getAuth();
+    console.log('[API] Token exists before logout:', auth?.accessToken ? 'YES' : 'NO');
 
     try {
       console.log('[API] Calling logout endpoint:', API_CONFIG.ENDPOINTS.LOGOUT);
@@ -208,11 +421,11 @@ class ApiService {
           message: error.message,
         });
       }
-      // Continue to clear token even if API call fails
+      // Continue to clear auth even if API call fails
     } finally {
-      console.log('[API] Clearing token from storage');
-      await this.clearToken();
-      console.log('[API] Token cleared from storage');
+      console.log('[API] Clearing auth from storage');
+      await this.clearAuth();
+      console.log('[API] Auth cleared from storage');
     }
   }
 
@@ -347,6 +560,7 @@ class ApiService {
     if (!url) return;
     setApiBaseUrl(url);
     this.api.defaults.baseURL = url;
+    this.rawApi.defaults.baseURL = url;
     console.log('[API] Base URL updated to:', url);
   }
 
@@ -373,21 +587,71 @@ class ApiService {
     if (this.dailyWs) return; // already running
 
     try {
-      this.getToken().then((token) => {
+      this.getToken().then(async (token) => {
         const base = API_CONFIG.BASE_URL || '';
         if (!base) {
           console.warn('[API] Cannot start WS: API base URL not set');
           return;
         }
 
+        // Don't attempt to connect if there's no token — server will 401
+        if (!token) {
+          console.warn('[API] No auth token available for WS; deferring WS start until token is present');
+          // schedule a reconnect attempt later (backoff)
+          this.scheduleDailyWsReconnect();
+          return;
+        }
+
+        // Validate token via REST before attempting WebSocket handshake to avoid 401 on upgrade
+        try {
+          await this.getUserProfile();
+          console.log('[API] Token validated via REST; proceeding with WS handshake');
+        } catch (err) {
+          console.error('[API] Token validation failed before WS handshake:', err);
+          // Broadcast a notification so UI can show a helpful message
+          try { this.broadcastNotification({ type: 'ws_auth_failed', message: 'WebSocket auth failed (token invalid)' }); } catch {}
+          // schedule reconnect (will re-check token later)
+          this.scheduleDailyWsReconnect();
+          return;
+        }
+
+        // If we have a token, attempt to decode and log helpful info for debugging
+        if (token) {
+          try {
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payloadB64 = parts[1];
+              let payloadJson = '';
+              if (typeof atob === 'function') {
+                payloadJson = decodeURIComponent(escape(atob(payloadB64)));
+              } else if (typeof Buffer !== 'undefined') {
+                payloadJson = Buffer.from(payloadB64, 'base64').toString('utf8');
+              }
+              const payload = JSON.parse(payloadJson || '{}');
+              const sub = payload.sub ?? payload.userId ?? null;
+              const exp = payload.exp ? new Date(payload.exp * 1000).toISOString() : null;
+              console.log('[API] WS token info: sub=', sub, 'exp=', exp);
+              if (exp && new Date(exp) < new Date()) {
+                console.warn('[API] WS token appears expired:', exp);
+              }
+            }
+          } catch (err) {
+            console.debug('[API] Failed to decode WS token payload:', err);
+          }
+        }
+
         // Convert http(s) to ws(s)
         const wsBase = base.replace(/^http/, 'ws');
         const wsPath = API_CONFIG.ENDPOINTS.WS_DAILY_QUESTIONS || '/ws/dailyquestions';
-        // backend expects the token as access_token query param
-        const tokenQuery = token ? `?access_token=${encodeURIComponent(token)}` : '';
+        // Send token as access_token query parameter per backend contract
+        // try configured param name (may be rotated on failures)
+        const paramName = this.dailyWsParamNames[this.dailyWsParamIndex] || 'access_token';
+        const tokenQuery = `?${paramName}=${encodeURIComponent(token)}`;
         const url = `${wsBase}${wsPath}${tokenQuery}`;
 
-        console.log('[API] Starting daily questions WS at:', url);
+        // Log URL but mask token value for security
+        const safeUrl = url.replace(/(access_token|token|accessToken)=([^&]+)/, `$1=****`);
+        console.log('[API] Starting daily questions WS at:', safeUrl);
 
         try {
           this.dailyWs = new WebSocket(url);
@@ -397,9 +661,15 @@ class ApiService {
           return;
         }
 
+        // Track whether this connection ever reached open state
+        let opened = false;
+
         this.dailyWs.onopen = () => {
           console.log('[API] Daily questions WS connected');
           this.dailyWsReconnectAttempts = 0;
+          opened = true;
+          // reset param index on success
+          this.dailyWsParamIndex = 0;
 
           // broadcast connection up
           try {
@@ -484,33 +754,43 @@ class ApiService {
 
         this.dailyWs.onerror = (ev) => {
           console.error('[API] Daily questions WS error:', ev);
+          try {
+            this.broadcastNotification({ type: 'ws_error', message: 'WebSocket error occurred' });
+          } catch (err) {
+            console.error('[API] Error broadcasting ws_error notification:', err);
+          }
         };
 
         this.dailyWs.onclose = (ev) => {
           console.warn('[API] Daily questions WS closed', ev.code, ev.reason);
           this.dailyWs = null;
-          // clear heartbeat
-          if (this.dailyWsPingIntervalId) {
-            clearInterval(this.dailyWsPingIntervalId);
-            this.dailyWsPingIntervalId = null;
-          }
-          // broadcast connection down
-          try {
-            this.broadcastConnectionStatus(false);
-          } catch (err) {
-            console.error('[API] Error broadcasting connection status:', err);
-          }
-          this.scheduleDailyWsReconnect();
-        };
+           // clear heartbeat
+           if (this.dailyWsPingIntervalId) {
+             clearInterval(this.dailyWsPingIntervalId);
+             this.dailyWsPingIntervalId = null;
+           }
+           // broadcast connection down
+           try {
+             this.broadcastConnectionStatus(false);
+           } catch (err) {
+             console.error('[API] Error broadcasting connection status:', err);
+           }
+           // If the socket never opened (likely 401 on handshake), try next param name on next reconnect
+           if (!opened) {
+             this.dailyWsParamIndex = (this.dailyWsParamIndex + 1) % this.dailyWsParamNames.length;
+             console.warn('[API] WS handshake did not complete; will try next token param name:', this.dailyWsParamNames[this.dailyWsParamIndex]);
+           }
+           this.scheduleDailyWsReconnect();
+         };
       }).catch(err => {
-        console.error('[API] Failed to get token for WS:', err);
-        this.scheduleDailyWsReconnect();
-      });
-    } catch (err) {
-      console.error('[API] startDailyWs error:', err);
-      this.scheduleDailyWsReconnect();
-    }
-  }
+         console.error('[API] Failed to get token for WS:', err);
+         this.scheduleDailyWsReconnect();
+       });
+     } catch (err) {
+       console.error('[API] startDailyWs error:', err);
+       this.scheduleDailyWsReconnect();
+     }
+   }
 
   private broadcastDailyQuestions(items: DailyQuestion[]) {
     if (this.dailyWsListeners.size === 0) return;

@@ -17,7 +17,6 @@ type AppState = 'dashboard' | 'questions' | 'results' | 'feedback' | 'settings';
 
 export function HomeScreen() {
   const [appState, setAppState] = useState<AppState>('dashboard');
-  // persistent notification history (manual dismiss)
   const [notifications, setNotifications] = useState<{ id: string; type: string; message?: string; timestamp?: string }[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [results, setResults] = useState<QuestionResult[]>([]);
