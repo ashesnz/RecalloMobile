@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError, isAxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { API_CONFIG, API_TIMEOUT, setApiBaseUrl } from '@/constants/api';
 import { LoginCredentials, RegisterCredentials, AuthResponse, User } from '@/types/auth';
@@ -8,9 +9,6 @@ import { Project } from '@/types/project';
 import { DailyQuestion } from '@/types/question';
 
 const TOKEN_KEY = 'auth_token';
-const isWeb = Platform.OS === 'web';
-const hasBrowserLocalStorage =
-  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 interface StoredAuth {
   accessToken: string;
@@ -285,8 +283,8 @@ class ApiService {
 
     try {
       const json = JSON.stringify(stored);
-      if (hasBrowserLocalStorage) {
-        window.localStorage.setItem(TOKEN_KEY, json);
+      if (Platform.OS === 'web') {
+        await AsyncStorage.setItem(TOKEN_KEY, json);
       } else {
         await SecureStore.setItemAsync(TOKEN_KEY, json);
       }
@@ -313,8 +311,8 @@ class ApiService {
 
   async getAuth(): Promise<StoredAuth | null> {
     try {
-      const raw = hasBrowserLocalStorage
-        ? window.localStorage.getItem(TOKEN_KEY)
+      const raw = Platform.OS === 'web'
+        ? await AsyncStorage.getItem(TOKEN_KEY)
         : await SecureStore.getItemAsync(TOKEN_KEY);
       if (!raw) return null;
       return JSON.parse(raw) as StoredAuth;
@@ -336,8 +334,8 @@ class ApiService {
 
   async clearAuth(): Promise<void> {
     try {
-      if (hasBrowserLocalStorage) {
-        window.localStorage.removeItem(TOKEN_KEY);
+      if (Platform.OS === 'web') {
+        await AsyncStorage.removeItem(TOKEN_KEY);
       } else {
         await SecureStore.deleteItemAsync(TOKEN_KEY);
       }
@@ -516,7 +514,7 @@ class ApiService {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          timeout: 30000, // 30 seconds for audio processing
+          timeout: 120000,
         }
       );
 
@@ -546,7 +544,7 @@ class ApiService {
           userAnswer: transcript,
         },
         {
-          timeout: 30000, // 30 seconds for AI evaluation
+          timeout: 60000, // 60 seconds (1 minute) for AI evaluation
         }
       );
 

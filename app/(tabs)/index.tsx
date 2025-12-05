@@ -122,8 +122,19 @@ export function HomeScreen() {
     console.log('[HomeScreen] Daily questions available:', dailyQuestions.length);
     console.log('[HomeScreen] Evaluations received:', evaluations.size);
 
+    // Debug: Log all evaluation keys and values
+    console.log('[HomeScreen] Evaluation Map contents:');
+    evaluations.forEach((evaluation, key) => {
+      console.log(`  - Question ID: ${key}`);
+      console.log(`    Grade: ${evaluation.grade}`);
+      console.log(`    Score: ${evaluation.score}`);
+      console.log(`    Feedback: ${evaluation.feedback}`);
+      console.log(`    Transcript: ${evaluation.transcript}`);
+    });
+
     // Convert evaluations to results
     const results = dailyQuestions.map((dailyQuestion) => {
+      console.log(`[HomeScreen] Processing question: ${dailyQuestion.id}`);
       const evaluation = evaluations.get(dailyQuestion.id);
 
       if (!evaluation) {
@@ -143,7 +154,7 @@ export function HomeScreen() {
       // Check if this was a "Not Sure" answer
       const isNotSure = evaluation.feedback === 'N/A - Question skipped';
 
-      return {
+      const result = {
         questionId: dailyQuestion.id,
         question: dailyQuestion.question,
         grade: evaluation.grade,
@@ -152,9 +163,13 @@ export function HomeScreen() {
         userAnswer: isNotSure ? '' : evaluation.transcript,
         correctAnswer: isNotSure ? undefined : evaluation.correctAnswer,
       };
+
+      console.log(`[HomeScreen] Created result for ${dailyQuestion.id}:`, result);
+      return result;
     });
 
     console.log('[HomeScreen] Generated results:', results.length);
+    console.log('[HomeScreen] Full results array:', JSON.stringify(results, null, 2));
     setResults(results);
     setAppState('results');
   };

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -37,16 +37,53 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
   const flatListRef = useRef<FlatList>(null);
   const recordingStartTime = useRef<number>(0);
 
+  // Use refs to track latest state for the callback
+  const evaluationsRef = useRef(evaluations);
+  const responsesRef = useRef(responses);
+  const notSureQuestionsRef = useRef(notSureQuestions);
+
+  // Update refs when state changes
+  React.useEffect(() => {
+    evaluationsRef.current = evaluations;
+  }, [evaluations]);
+
+  React.useEffect(() => {
+    responsesRef.current = responses;
+  }, [responses]);
+
+  React.useEffect(() => {
+    notSureQuestionsRef.current = notSureQuestions;
+  }, [notSureQuestions]);
+
+  // Update canSwipe when evaluations or notSureQuestions change
+  React.useEffect(() => {
+    if (currentIndex < questions.length) {
+      const currentQuestion = questions[currentIndex];
+      const hasEvaluation = evaluations.has(currentQuestion.id);
+      const isNotSure = notSureQuestions.has(currentQuestion.id);
+      setCanSwipe(hasEvaluation || isNotSure);
+    }
+  }, [evaluations, notSureQuestions, currentIndex, questions]);
+
   const dataWithEnd = [...questions, { id: '__completion__', text: '' } as Question];
 
-  const onViewableItemsChanged = useRef(
+  const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const newIndex = viewableItems[0].index;
 
         // Check if we've reached the completion marker
         if (newIndex >= questions.length) {
-          onComplete(responses, evaluations);
+          const currentEvaluations = evaluationsRef.current;
+          const currentResponses = responsesRef.current;
+
+          console.log('[QuestionSwiper] Reached completion marker');
+          console.log('[QuestionSwiper] Evaluations Map size:', currentEvaluations.size);
+          console.log('[QuestionSwiper] Evaluations Map keys:', Array.from(currentEvaluations.keys()));
+          currentEvaluations.forEach((evaluation, key) => {
+            console.log(`[QuestionSwiper] Evaluation for ${key}:`, evaluation);
+          });
+          onComplete(currentResponses, currentEvaluations);
           return;
         }
 
@@ -57,12 +94,17 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
         // Check if the new question has already been answered or marked as "Not Sure"
         const newQuestion = questions[newIndex];
-        const hasEvaluation = evaluations.has(newQuestion.id);
-        const isNotSure = notSureQuestions.has(newQuestion.id);
+        const hasEvaluation = evaluationsRef.current.has(newQuestion.id);
+        const isNotSure = notSureQuestionsRef.current.has(newQuestion.id);
         setCanSwipe(hasEvaluation || isNotSure);
       }
-    }
-  ).current;
+    },
+    [questions, onComplete]
+  );
+
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 50,
+  });
 
   const handleRecordingStart = () => {
     setIsRecording(true);
@@ -80,6 +122,8 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
       try {
         const currentQuestion = questions[currentIndex];
         console.log('[QuestionSwiper] Evaluating answer for:', currentQuestion.id);
+        console.log('[QuestionSwiper] Question text:', currentQuestion.text);
+        console.log('[QuestionSwiper] Transcript:', transcript);
 
         const evaluation = await apiService.evaluateAnswer(
           currentQuestion.id,
@@ -87,12 +131,24 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
           transcript
         );
 
+        console.log('[QuestionSwiper] Evaluation received from API:', evaluation);
+
         // Store the evaluation result
-        setEvaluations(prev => new Map(prev).set(currentQuestion.id, {
+        const fullEvaluation = {
           questionId: currentQuestion.id,
           transcript,
           ...evaluation,
-        }));
+        };
+
+        console.log('[QuestionSwiper] Storing full evaluation:', fullEvaluation);
+
+        setEvaluations(prev => {
+          const newMap = new Map(prev);
+          newMap.set(currentQuestion.id, fullEvaluation);
+          console.log('[QuestionSwiper] Updated evaluations Map size:', newMap.size);
+          console.log('[QuestionSwiper] Map keys:', Array.from(newMap.keys()));
+          return newMap;
+        });
 
         // Enable swiping after evaluation completes
         setCanSwipe(true);
@@ -143,10 +199,16 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
       grade: 'F',
       score: 0,
       feedback: 'N/A - Question skipped',
-      correctAnswer: currentQuestion.text, // Show the question as reference
     };
 
-    setEvaluations(prev => new Map(prev).set(currentQuestion.id, naEvaluation));
+    console.log('[QuestionSwiper] Creating N/A evaluation:', naEvaluation);
+
+    setEvaluations(prev => {
+      const newMap = new Map(prev);
+      newMap.set(currentQuestion.id, naEvaluation);
+      console.log('[QuestionSwiper] Updated evaluations Map (after Not Sure) size:', newMap.size);
+      return newMap;
+    });
 
     // Save response with N/A
     const naResponse: QuestionResponse = {
@@ -350,10 +412,8 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{
-          itemVisiblePercentThreshold: 50,
-        }}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={viewabilityConfigRef.current}
         scrollEnabled={!isRecording && canSwipe}
         getItemLayout={(_, index) => ({
           length: SCREEN_WIDTH,
