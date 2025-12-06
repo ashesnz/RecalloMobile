@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Modal, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FolderIcon, TimeIcon } from '@/components/ui/icon';
-import { Colors as ThemeColors, Spacing, BorderRadius, Typography } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { apiService } from '@/services/api';
 import { settingsStorage } from '@/services/settings-storage';
 import { ProjectList } from './project-list';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { getProfileFulfilled } from '@/stores/auth/authSlice';
 import type { UpdateUserDto, User } from '@/types/auth';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface QuestionSettingsFormProps {
   projectName?: string | null;
@@ -17,7 +18,8 @@ interface QuestionSettingsFormProps {
 }
 
 export function QuestionSettingsForm({ projectName: initialProjectName, scheduledTime: initialScheduledTime, onSettingsChange }: QuestionSettingsFormProps) {
-  const colors: any = ThemeColors.light;
+  const colorScheme = useColorScheme();
+  const colors: any = Colors[colorScheme ?? 'light'];
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s: any) => s.auth?.user ?? null) as User | null;
 

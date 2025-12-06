@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SettingsIcon, FolderIcon, TimeIcon, LockIcon } from '@/components/ui/icon';
-import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Shadow } from '@/constants/theme';
 import { apiService } from '@/services/api';
 import type { UpdateUserDto, User } from '@/types/auth';
 import { settingsStorage } from '@/services/settings-storage';
 import { ProjectList, ProjectItem } from './project-list';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { getProfileFulfilled } from '@/stores/auth/authSlice';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface QuestionSettingsWidgetProps {
   projectName?: string;
@@ -21,8 +22,8 @@ export function QuestionSettingsWidget({
   scheduledTime,
   onSettingsChange,
 }: QuestionSettingsWidgetProps) {
-  // Use the app light theme tokens so the widget matches the Explore/Profile page styling
-  const colors: any = ThemeColors.light;
+  const colorScheme = useColorScheme();
+  const colors: any = Colors[colorScheme ?? 'light'];
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s: any) => s.auth?.user ?? null) as User | null;
 

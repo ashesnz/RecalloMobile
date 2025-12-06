@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SettingsIcon, LockIcon } from '@/components/ui/icon';
-import { Colors as ThemeColors, Spacing, BorderRadius, Typography, Shadow, IconSize } from '@/constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Shadow, IconSize } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/stores/hooks';
 import { apiService } from '@/services/api';
 import { getProfileFulfilled } from '@/stores/auth/authSlice';
 import { QuestionSettingsForm } from './question-settings-form';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 interface SettingsWidgetProps {
   projectName?: string | undefined;
@@ -14,7 +15,8 @@ interface SettingsWidgetProps {
 }
 
 export function SettingsWidget({ projectName, scheduledTime, onSettingsChange }: SettingsWidgetProps) {
-  const colors: any = ThemeColors.light;
+  const colorScheme = useColorScheme();
+  const colors: any = Colors[colorScheme ?? 'light'];
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((s: any) => s.auth?.user ?? null);
 
@@ -63,7 +65,6 @@ export function SettingsWidget({ projectName, scheduledTime, onSettingsChange }:
         <Text style={[styles.subtitle, styles.indentedSubtitle, { color: colors.textSecondary }]}>AI settings</Text>
 
       <View style={[styles.section, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}>
-
         <View style={styles.settingRow}>
           <View style={styles.settingLabelContainer}>
             <LockIcon size="sm" color={colors.textSecondary} />

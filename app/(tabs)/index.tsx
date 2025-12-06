@@ -394,4 +394,5 @@ const styles = StyleSheet.create({
   },
 });
 
+// Keep default export for Expo Router and suppress unused-default-export lint warning
 export default HomeScreen;

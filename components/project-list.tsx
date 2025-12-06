@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CheckIcon } from '@/components/ui/icon';
-import { Colors as ThemeColors, Spacing, Typography } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type ProjectItem = {
   id: string;
@@ -17,12 +18,13 @@ type ProjectCellProps = {
 };
 
 const ProjectCell = ({ item, index, currentProjectId, onSelect }: ProjectCellProps) => {
-  const colors = ThemeColors.light;
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const isSelected = currentProjectId === item.id;
 
   return (
     <Pressable onPress={() => onSelect(item.id)}>
-      <View style={[styles.row, index !== 0 && styles.rowSeparator, isSelected && { backgroundColor: colors.primary + '20', borderRadius: 8 }]}>
+      <View style={[styles.row, index !== 0 && { borderTopColor: colors.border }, isSelected && { backgroundColor: colors.primary + '20', borderRadius: 8 }]}>
         <Text style={[styles.title, { color: colors.text }]}>{item.name}</Text>
         {isSelected && <CheckIcon size="md" color={colors.primary} />}
       </View>
@@ -67,7 +69,6 @@ const styles = StyleSheet.create({
   },
   rowSeparator: {
     borderTopWidth: 1,
-    borderTopColor: ThemeColors.light.border,
   },
   title: {
     fontSize: Typography.fontSize.base,
