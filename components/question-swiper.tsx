@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useReducer, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -23,47 +23,118 @@ interface QuestionSwiperProps {
   onComplete: (responses: QuestionResponse[], evaluations: Map<string, EvaluationResponse>) => void;
 }
 
+interface QuestionState {
+  currentIndex: number;
+  responses: QuestionResponse[];
+  evaluations: Map<string, EvaluationResponse>;
+  notSureQuestions: Set<string>;
+  isRecording: boolean;
+  isEvaluating: boolean;
+  currentTranscript: string;
+  canSwipe: boolean;
+}
+
+type QuestionAction =
+  | { type: 'SET_CURRENT_INDEX'; index: number }
+  | { type: 'SET_RECORDING'; isRecording: boolean }
+  | { type: 'SET_EVALUATING'; isEvaluating: boolean }
+  | { type: 'SET_TRANSCRIPT'; transcript: string }
+  | { type: 'ADD_RESPONSE'; response: QuestionResponse }
+  | { type: 'ADD_EVALUATION'; questionId: string; evaluation: EvaluationResponse }
+  | { type: 'MARK_NOT_SURE'; questionId: string; evaluation: EvaluationResponse }
+  | { type: 'UPDATE_CAN_SWIPE'; questions: Question[] };
+
+function questionReducer(state: QuestionState, action: QuestionAction): QuestionState {
+  switch (action.type) {
+    case 'SET_CURRENT_INDEX':
+      return {
+        ...state,
+        currentIndex: action.index,
+        currentTranscript: '',
+        canSwipe: action.index < state.evaluations.size ?
+          state.evaluations.has(Array.from(state.evaluations.keys())[action.index]) :
+          false,
+      };
+
+    case 'SET_RECORDING':
+      return { ...state, isRecording: action.isRecording };
+
+    case 'SET_EVALUATING':
+      return { ...state, isEvaluating: action.isEvaluating };
+
+    case 'SET_TRANSCRIPT':
+      return { ...state, currentTranscript: action.transcript };
+
+    case 'ADD_RESPONSE': {
+      const filtered = state.responses.filter(r => r.questionId !== action.response.questionId);
+      return {
+        ...state,
+        responses: [...filtered, action.response],
+      };
+    }
+
+    case 'ADD_EVALUATION': {
+      const newEvaluations = new Map(state.evaluations);
+      newEvaluations.set(action.questionId, action.evaluation);
+      return {
+        ...state,
+        evaluations: newEvaluations,
+        canSwipe: true,
+      };
+    }
+
+    case 'MARK_NOT_SURE': {
+      const newEvaluations = new Map(state.evaluations);
+      newEvaluations.set(action.questionId, action.evaluation);
+      const newNotSureQuestions = new Set(state.notSureQuestions);
+      newNotSureQuestions.add(action.questionId);
+      const filtered = state.responses.filter(r => r.questionId !== action.questionId);
+      return {
+        ...state,
+        evaluations: newEvaluations,
+        notSureQuestions: newNotSureQuestions,
+        responses: [...filtered, { questionId: action.questionId, transcript: 'Not Sure' }],
+        canSwipe: true,
+        currentTranscript: '',
+      };
+    }
+
+    case 'UPDATE_CAN_SWIPE': {
+      if (state.currentIndex >= action.questions.length) {
+        return state;
+      }
+      const currentQuestion = action.questions[state.currentIndex];
+      const hasEvaluation = state.evaluations.has(currentQuestion.id);
+      const isNotSure = state.notSureQuestions.has(currentQuestion.id);
+      return {
+        ...state,
+        canSwipe: hasEvaluation || isNotSure,
+      };
+    }
+
+    default:
+      return state;
+  }
+}
+
+const initialState: QuestionState = {
+  currentIndex: 0,
+  responses: [],
+  evaluations: new Map(),
+  notSureQuestions: new Set(),
+  isRecording: false,
+  isEvaluating: false,
+  currentTranscript: '',
+  canSwipe: false,
+};
+
 export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [responses, setResponses] = useState<QuestionResponse[]>([]);
-  const [evaluations, setEvaluations] = useState<Map<string, EvaluationResponse>>(new Map());
-  const [notSureQuestions, setNotSureQuestions] = useState<Set<string>>(new Set());
-  const [isRecording, setIsRecording] = useState(false);
-  const [isEvaluating, setIsEvaluating] = useState(false);
-  const [currentTranscript, setCurrentTranscript] = useState('');
-  const [canSwipe, setCanSwipe] = useState(false);
+  const [state, dispatch] = useReducer(questionReducer, initialState);
   const flatListRef = useRef<FlatList>(null);
   const recordingStartTime = useRef<number>(0);
 
-  // Use refs to track latest state for the callback
-  const evaluationsRef = useRef(evaluations);
-  const responsesRef = useRef(responses);
-  const notSureQuestionsRef = useRef(notSureQuestions);
-
-  // Update refs when state changes
-  React.useEffect(() => {
-    evaluationsRef.current = evaluations;
-  }, [evaluations]);
-
-  React.useEffect(() => {
-    responsesRef.current = responses;
-  }, [responses]);
-
-  React.useEffect(() => {
-    notSureQuestionsRef.current = notSureQuestions;
-  }, [notSureQuestions]);
-
-  // Update canSwipe when evaluations or notSureQuestions change
-  React.useEffect(() => {
-    if (currentIndex < questions.length) {
-      const currentQuestion = questions[currentIndex];
-      const hasEvaluation = evaluations.has(currentQuestion.id);
-      const isNotSure = notSureQuestions.has(currentQuestion.id);
-      setCanSwipe(hasEvaluation || isNotSure);
-    }
-  }, [evaluations, notSureQuestions, currentIndex, questions]);
 
   const dataWithEnd = [...questions, { id: '__completion__', text: '' } as Question];
 
@@ -72,34 +143,21 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
         const newIndex = viewableItems[0].index;
 
-        // Check if we've reached the completion marker
         if (newIndex >= questions.length) {
-          const currentEvaluations = evaluationsRef.current;
-          const currentResponses = responsesRef.current;
-
           console.log('[QuestionSwiper] Reached completion marker');
-          console.log('[QuestionSwiper] Evaluations Map size:', currentEvaluations.size);
-          console.log('[QuestionSwiper] Evaluations Map keys:', Array.from(currentEvaluations.keys()));
-          currentEvaluations.forEach((evaluation, key) => {
+          console.log('[QuestionSwiper] Evaluations Map size:', state.evaluations.size);
+          console.log('[QuestionSwiper] Evaluations Map keys:', Array.from(state.evaluations.keys()));
+          state.evaluations.forEach((evaluation, key) => {
             console.log(`[QuestionSwiper] Evaluation for ${key}:`, evaluation);
           });
-          onComplete(currentResponses, currentEvaluations);
+          onComplete(state.responses, state.evaluations);
           return;
         }
 
-        setCurrentIndex(newIndex);
-
-        // Clear transcript when moving to a new question
-        setCurrentTranscript('');
-
-        // Check if the new question has already been answered or marked as "Not Sure"
-        const newQuestion = questions[newIndex];
-        const hasEvaluation = evaluationsRef.current.has(newQuestion.id);
-        const isNotSure = notSureQuestionsRef.current.has(newQuestion.id);
-        setCanSwipe(hasEvaluation || isNotSure);
+        dispatch({ type: 'SET_CURRENT_INDEX', index: newIndex });
       }
     },
-    [questions, onComplete]
+    [questions, state.evaluations, state.responses, onComplete]
   );
 
   const viewabilityConfigRef = useRef({
@@ -107,20 +165,19 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
   });
 
   const handleRecordingStart = () => {
-    setIsRecording(true);
-    setCurrentTranscript('');
+    dispatch({ type: 'SET_RECORDING', isRecording: true });
+    dispatch({ type: 'SET_TRANSCRIPT', transcript: '' });
     recordingStartTime.current = Date.now();
-    console.log('Recording started for question:', questions[currentIndex].id);
+    console.log('Recording started for question:', questions[state.currentIndex].id);
   };
 
   const handleTranscriptUpdate = async (transcript: string) => {
-    setCurrentTranscript(transcript);
+    dispatch({ type: 'SET_TRANSCRIPT', transcript });
 
-    // Evaluate the answer immediately after transcription
     if (transcript.trim()) {
-      setIsEvaluating(true);
+      dispatch({ type: 'SET_EVALUATING', isEvaluating: true });
       try {
-        const currentQuestion = questions[currentIndex];
+        const currentQuestion = questions[state.currentIndex];
         console.log('[QuestionSwiper] Evaluating answer for:', currentQuestion.id);
         console.log('[QuestionSwiper] Question text:', currentQuestion.text);
         console.log('[QuestionSwiper] Transcript:', transcript);
@@ -133,7 +190,6 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
         console.log('[QuestionSwiper] Evaluation received from API:', evaluation);
 
-        // Store the evaluation result
         const fullEvaluation = {
           questionId: currentQuestion.id,
           transcript,
@@ -142,57 +198,40 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
         console.log('[QuestionSwiper] Storing full evaluation:', fullEvaluation);
 
-        setEvaluations(prev => {
-          const newMap = new Map(prev);
-          newMap.set(currentQuestion.id, fullEvaluation);
-          console.log('[QuestionSwiper] Updated evaluations Map size:', newMap.size);
-          console.log('[QuestionSwiper] Map keys:', Array.from(newMap.keys()));
-          return newMap;
+        dispatch({
+          type: 'ADD_EVALUATION',
+          questionId: currentQuestion.id,
+          evaluation: fullEvaluation
         });
-
-        // Enable swiping after evaluation completes
-        setCanSwipe(true);
 
         console.log('[QuestionSwiper] Evaluation complete:', evaluation);
       } catch (error) {
         console.error('[QuestionSwiper] Evaluation error:', error);
-        // Still save the transcript even if evaluation fails
       } finally {
-        setIsEvaluating(false);
+        dispatch({ type: 'SET_EVALUATING', isEvaluating: false });
       }
     }
   };
 
   const handleRecordingEnd = () => {
-    setIsRecording(false);
+    dispatch({ type: 'SET_RECORDING', isRecording: false });
     const duration = Date.now() - recordingStartTime.current;
     console.log('Recording ended. Duration:', duration, 'ms');
 
-    // Save the response with the current transcript
-    if (currentTranscript.trim()) {
+    if (state.currentTranscript.trim()) {
       const newResponse: QuestionResponse = {
-        questionId: questions[currentIndex].id,
-        transcript: currentTranscript,
+        questionId: questions[state.currentIndex].id,
+        transcript: state.currentTranscript,
       };
 
-      const updatedResponses = [
-        ...responses.filter(r => r.questionId !== questions[currentIndex].id),
-        newResponse,
-      ];
-      setResponses(updatedResponses);
+      dispatch({ type: 'ADD_RESPONSE', response: newResponse });
     }
-
-    // No auto-advance - user must swipe to next question
   };
 
   const handleNotSure = () => {
-    const currentQuestion = questions[currentIndex];
+    const currentQuestion = questions[state.currentIndex];
     console.log('[QuestionSwiper] User marked as Not Sure:', currentQuestion.id);
 
-    // Add to not sure set
-    setNotSureQuestions(prev => new Set(prev).add(currentQuestion.id));
-
-    // Create N/A evaluation
     const naEvaluation: EvaluationResponse = {
       questionId: currentQuestion.id,
       transcript: '',
@@ -203,34 +242,14 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
     console.log('[QuestionSwiper] Creating N/A evaluation:', naEvaluation);
 
-    setEvaluations(prev => {
-      const newMap = new Map(prev);
-      newMap.set(currentQuestion.id, naEvaluation);
-      console.log('[QuestionSwiper] Updated evaluations Map (after Not Sure) size:', newMap.size);
-      return newMap;
-    });
-
-    // Save response with N/A
-    const naResponse: QuestionResponse = {
+    dispatch({
+      type: 'MARK_NOT_SURE',
       questionId: currentQuestion.id,
-      transcript: 'Not Sure',
-    };
-
-    const updatedResponses = [
-      ...responses.filter(r => r.questionId !== currentQuestion.id),
-      naResponse,
-    ];
-    setResponses(updatedResponses);
-
-    // Enable swiping
-    setCanSwipe(true);
-
-    // Clear any current transcript
-    setCurrentTranscript('');
+      evaluation: naEvaluation
+    });
   };
 
   const renderQuestion = ({ item, index }: { item: Question; index: number }) => {
-    // Render completion screen for the final swipe
     if (item.id === '__completion__') {
       return (
         <View style={styles.questionContainer}>
@@ -243,8 +262,8 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
       );
     }
 
-    const evaluation = evaluations.get(item.id);
-    const isCurrentQuestion = index === currentIndex;
+    const evaluation = state.evaluations.get(item.id);
+    const isCurrentQuestion = index === state.currentIndex;
 
     return (
       <View style={styles.questionContainer}>
@@ -257,8 +276,8 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
 
           {/* Transcript display area */}
           {(() => {
-            const saved = responses.find(r => r.questionId === item.id)?.transcript;
-            const showLive = isCurrentQuestion && currentTranscript && currentTranscript.trim().length > 0;
+            const saved = state.responses.find(r => r.questionId === item.id)?.transcript;
+            const showLive = isCurrentQuestion && state.currentTranscript && state.currentTranscript.trim().length > 0;
 
             if (showLive) {
               return (
@@ -270,7 +289,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
                     Your answer (live):
                   </Text>
                   <Text style={[styles.transcriptText, { color: colors.text }]}>
-                    {currentTranscript}
+                    {state.currentTranscript}
                   </Text>
                 </View>
               );
@@ -296,7 +315,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
           })()}
 
           {/* Evaluation feedback display */}
-          {isCurrentQuestion && isEvaluating && (
+          {isCurrentQuestion && state.isEvaluating && (
             <View style={[styles.evaluationContainer, { backgroundColor: colors.card }]}>
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={[styles.evaluatingText, { color: colors.textSecondary }]}>
@@ -345,7 +364,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
           </View>
 
           {/* Not Sure Button */}
-          {isCurrentQuestion && !evaluation && !isEvaluating && (
+          {isCurrentQuestion && !evaluation && !state.isEvaluating && (
             <View style={styles.notSureContainer}>
               <TouchableOpacity
                 style={[styles.notSureButton, {
@@ -353,11 +372,11 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
                   borderColor: colors.textSecondary,
                 }]}
                 onPress={handleNotSure}
-                disabled={isRecording}
+                disabled={state.isRecording}
               >
                 <Text style={[styles.notSureButtonText, {
                   color: colors.textSecondary,
-                  opacity: isRecording ? 0.5 : 1,
+                  opacity: state.isRecording ? 0.5 : 1,
                 }]}>
                   Not Sure
                 </Text>
@@ -380,7 +399,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
                 />
               ))}
             </View>
-            {isCurrentQuestion && canSwipe && (
+            {isCurrentQuestion && state.canSwipe && (
               <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
                 {index < questions.length - 1 ? 'Swipe left for next question →' : 'Swipe left to finish →'}
               </Text>
@@ -414,7 +433,7 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={handleViewableItemsChanged}
         viewabilityConfig={viewabilityConfigRef.current}
-        scrollEnabled={!isRecording && canSwipe}
+        scrollEnabled={!state.isRecording && state.canSwipe}
         getItemLayout={(_, index) => ({
           length: SCREEN_WIDTH,
           offset: SCREEN_WIDTH * index,
