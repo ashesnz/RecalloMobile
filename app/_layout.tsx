@@ -10,6 +10,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { LoginScreen } from '@/app/screens/auth';
 import { Colors } from '@/constants/theme';
 import { store, persistor } from '@/stores/store';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -17,6 +19,7 @@ export const unstable_settings = {
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
+  const colorScheme = useColorScheme();
 
   console.log('[RootLayoutNav] Rendering - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
 
@@ -33,12 +36,15 @@ function RootLayoutNav() {
       )}
 
       {!isLoading && isAuthenticated && (
-        <ThemeProvider value={DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+        <SafeAreaProvider>
+          <ThemeProvider value={DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            </Stack>
+            {/* Configure status bar centrally based on color scheme. */}
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          </ThemeProvider>
+        </SafeAreaProvider>
       )}
     </>
   );

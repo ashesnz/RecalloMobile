@@ -7,11 +7,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { showAlert } from '@/utils/alert';
 import { SettingsWidget } from '@/components/settings-widget';
 import { settingsStorage } from '@/services/settings-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export function SettingsScreen() {
   const { user, logout, isLoadingUser } = useAuth();
   const colorScheme = useColorScheme();
   const colors = ThemeColors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const [questionSettings, setQuestionSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -39,8 +41,8 @@ export function SettingsScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }] }>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <Ionicons name="person-circle" size={100} color={colors.primary} />
@@ -85,7 +87,7 @@ export function SettingsScreen() {
 
         <Text style={[styles.footer, { color: colors.textSecondary }]}>© 2026 Recallo. All rights reserved.</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -94,7 +96,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 60,
     paddingHorizontal: Spacing.base,
     paddingBottom: Spacing['3xl'],
   },

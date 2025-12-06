@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { QuestionSwiper } from '@/components/question-swiper';
 import { ResultsScreen } from '@/app/screens/results';
 import { FeedbackDetail } from '@/components/feedback-detail';
@@ -13,12 +13,14 @@ import { useAuth } from '@/hooks/use-auth';
 import { getPersonalizedGreeting } from '@/utils/greeting';
 import { settingsStorage } from '@/services/settings-storage';
 import { apiService } from '@/services/api';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type AppState = 'dashboard' | 'questions' | 'results' | 'feedback' | 'settings';
 
 export function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [notifications, setNotifications] = useState<{ id: string; type: string; message?: string; timestamp?: string }[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -194,46 +196,48 @@ export function HomeScreen() {
   // Dashboard Screen
   if (appState === 'dashboard') {
     return (
-      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.dashboardContainer}>
-          <View style={styles.headerRow}>
-            <Text style={[styles.welcomeBack, { color: colors.text }]}>{getPersonalizedGreeting(user?.name)}!</Text>
-            <View style={[styles.connectionPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.connectionText, { color: isConnected ? colors.success : colors.textSecondary }]}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
-            </View>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'android' ? insets.top : 0 }} edges={['top', 'bottom']}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }] } style={{ flex: 1 }}>
+          <View style={styles.dashboardContainer}>
+           <View style={styles.headerRow}>
+             <Text style={[styles.welcomeBack, { color: colors.text }]}>{getPersonalizedGreeting(user?.name)}!</Text>
+             <View style={[styles.connectionPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+               <Text style={[styles.connectionText, { color: isConnected ? colors.success : colors.textSecondary }]}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
+             </View>
+           </View>
+
+           <DailyQuestionsWidget
+             onPress={handleStartSession}
+             questionCount={dailyQuestions.length}
+             isLoading={isLoadingQuestions}
+           />
+
+           {/* Persistent notifications history */}
+           {notifications.length > 0 && (
+             <View style={styles.notificationsList}>
+               <View style={styles.notificationsHeader}>
+                 <Text style={styles.notificationsTitle}>Notifications</Text>
+                 <TouchableOpacity onPress={() => setNotifications([])}>
+                   <Text style={[styles.dismissAll, { color: colors.primary }]}>Dismiss all</Text>
+                 </TouchableOpacity>
+               </View>
+               {notifications.map(n => (
+                 <View key={n.id} style={[styles.notificationItem, { backgroundColor: colors.card, borderColor: colors.border }] }>
+                   <Text style={[styles.notificationTextSmall, { color: colors.text }]}>{n.type === 'daily_questions_ready' ? 'Daily questions ready' : n.message ?? n.type}</Text>
+                   <View style={styles.notificationActions}>
+                     <Text style={[styles.notificationTime, { color: colors.textSecondary }]}>{n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}</Text>
+                     <TouchableOpacity onPress={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}>
+                       <Text style={[styles.dismissText, { color: colors.primary }]}>Dismiss</Text>
+                     </TouchableOpacity>
+                   </View>
+                 </View>
+               ))}
+             </View>
+           )}
+
           </View>
-
-          <DailyQuestionsWidget
-            onPress={handleStartSession}
-            questionCount={dailyQuestions.length}
-            isLoading={isLoadingQuestions}
-          />
-
-          {/* Persistent notifications history */}
-          {notifications.length > 0 && (
-            <View style={styles.notificationsList}>
-              <View style={styles.notificationsHeader}>
-                <Text style={styles.notificationsTitle}>Notifications</Text>
-                <TouchableOpacity onPress={() => setNotifications([])}>
-                  <Text style={[styles.dismissAll, { color: colors.primary }]}>Dismiss all</Text>
-                </TouchableOpacity>
-              </View>
-              {notifications.map(n => (
-                <View key={n.id} style={[styles.notificationItem, { backgroundColor: colors.card, borderColor: colors.border }] }>
-                  <Text style={[styles.notificationTextSmall, { color: colors.text }]}>{n.type === 'daily_questions_ready' ? 'Daily questions ready' : n.message ?? n.type}</Text>
-                  <View style={styles.notificationActions}>
-                    <Text style={[styles.notificationTime, { color: colors.textSecondary }]}>{n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}</Text>
-                    <TouchableOpacity onPress={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}>
-                      <Text style={[styles.dismissText, { color: colors.primary }]}>Dismiss</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
   },
   dashboardContainer: {
     flex: 1,
-    paddingTop: 60,
+    // top padding is handled by SafeAreaView / insets
     paddingBottom: 20,
   },
   welcomeBack: {
