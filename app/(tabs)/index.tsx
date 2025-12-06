@@ -8,6 +8,7 @@ import { QuestionSettingsForm } from '@/components/question-settings-form';
 import { QuestionResponse, QuestionResult, Question, DailyQuestion } from '@/types/question';
 import { QuestionSettings } from '@/types/project';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
 import { getPersonalizedGreeting } from '@/utils/greeting';
 import { settingsStorage } from '@/services/settings-storage';
@@ -16,6 +17,8 @@ import { apiService } from '@/services/api';
 type AppState = 'dashboard' | 'questions' | 'results' | 'feedback' | 'settings';
 
 export function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
   const [appState, setAppState] = useState<AppState>('dashboard');
   const [notifications, setNotifications] = useState<{ id: string; type: string; message?: string; timestamp?: string }[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -191,12 +194,12 @@ export function HomeScreen() {
   // Dashboard Screen
   if (appState === 'dashboard') {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.scrollContent}>
         <View style={styles.dashboardContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.welcomeBack}>{getPersonalizedGreeting(user?.name)}!</Text>
-            <View style={[styles.connectionPill, isConnected ? styles.connected : styles.disconnected]}>
-              <Text style={styles.connectionText}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
+            <Text style={[styles.welcomeBack, { color: colors.text }]}>{getPersonalizedGreeting(user?.name)}!</Text>
+            <View style={[styles.connectionPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.connectionText, { color: isConnected ? colors.success : colors.textSecondary }]}>{isConnected ? 'Connected' : 'Disconnected'}</Text>
             </View>
           </View>
 
@@ -212,16 +215,16 @@ export function HomeScreen() {
               <View style={styles.notificationsHeader}>
                 <Text style={styles.notificationsTitle}>Notifications</Text>
                 <TouchableOpacity onPress={() => setNotifications([])}>
-                  <Text style={styles.dismissAll}>Dismiss all</Text>
+                  <Text style={[styles.dismissAll, { color: colors.primary }]}>Dismiss all</Text>
                 </TouchableOpacity>
               </View>
               {notifications.map(n => (
-                <View key={n.id} style={styles.notificationItem}>
-                  <Text style={styles.notificationTextSmall}>{n.type === 'daily_questions_ready' ? 'Daily questions ready' : n.message ?? n.type}</Text>
+                <View key={n.id} style={[styles.notificationItem, { backgroundColor: colors.card, borderColor: colors.border }] }>
+                  <Text style={[styles.notificationTextSmall, { color: colors.text }]}>{n.type === 'daily_questions_ready' ? 'Daily questions ready' : n.message ?? n.type}</Text>
                   <View style={styles.notificationActions}>
-                    <Text style={styles.notificationTime}>{n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}</Text>
+                    <Text style={[styles.notificationTime, { color: colors.textSecondary }]}>{n.timestamp ? new Date(n.timestamp).toLocaleString() : ''}</Text>
                     <TouchableOpacity onPress={() => setNotifications(prev => prev.filter(x => x.id !== n.id))}>
-                      <Text style={styles.dismissText}>Dismiss</Text>
+                      <Text style={[styles.dismissText, { color: colors.primary }]}>Dismiss</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -303,7 +306,6 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   headerRow: {
     flexDirection: 'row',
@@ -315,15 +317,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 12,
+    borderWidth: 1,
   },
   connected: {
-    backgroundColor: '#e6ffed',
+    // kept for backward compatibility; overridden by inline styles
   },
   disconnected: {
-    backgroundColor: '#ffecec',
+    // kept for backward compatibility; overridden by inline styles
   },
   connectionText: {
-    color: '#0b723b',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -341,19 +343,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   dismissAll: {
-    color: '#7a4f01',
     fontWeight: '600',
   },
   notificationItem: {
-    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#eee',
   },
   notificationTextSmall: {
-    color: '#333',
   },
   notificationActions: {
     flexDirection: 'row',
@@ -362,11 +360,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   notificationTime: {
-    color: '#999',
     fontSize: 12,
   },
   dismissText: {
-    color: '#d9534f',
     fontWeight: '700',
   },
   scrollContent: {
@@ -380,7 +376,6 @@ const styles = StyleSheet.create({
   welcomeBack: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.light.text,
     marginBottom: 30,
     paddingHorizontal: 20,
   },
