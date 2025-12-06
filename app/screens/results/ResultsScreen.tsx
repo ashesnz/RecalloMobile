@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QuestionResult } from '@/types/question';
 import { ChatIcon, RefreshIcon } from '@/components/ui/icon';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -21,6 +22,7 @@ interface ResultsScreenProps {
 export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsScreenProps) {
   const colorScheme = useColorScheme();
   const colors = ThemeColors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
 
 
   const getGradeColor = (grade: string) => {
@@ -36,8 +38,8 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]} showsVerticalScrollIndicator={false}>
         {/* Individual Question Results */}
         <View style={styles.resultsContainer}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -113,7 +115,7 @@ export function ResultsScreen({ results, onQuestionPress, onRestart }: ResultsSc
           </Pressable>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
