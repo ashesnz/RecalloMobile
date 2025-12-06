@@ -134,7 +134,11 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
   const [state, dispatch] = useReducer(questionReducer, initialState);
   const flatListRef = useRef<FlatList>(null);
   const recordingStartTime = useRef<number>(0);
+  const stateRef = useRef(state);
 
+  React.useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const dataWithEnd = [...questions, { id: '__completion__', text: '' } as Question];
 
@@ -144,20 +148,21 @@ export function QuestionSwiper({ questions, onComplete }: QuestionSwiperProps) {
         const newIndex = viewableItems[0].index;
 
         if (newIndex >= questions.length) {
+          const currentState = stateRef.current;
           console.log('[QuestionSwiper] Reached completion marker');
-          console.log('[QuestionSwiper] Evaluations Map size:', state.evaluations.size);
-          console.log('[QuestionSwiper] Evaluations Map keys:', Array.from(state.evaluations.keys()));
-          state.evaluations.forEach((evaluation, key) => {
+          console.log('[QuestionSwiper] Evaluations Map size:', currentState.evaluations.size);
+          console.log('[QuestionSwiper] Evaluations Map keys:', Array.from(currentState.evaluations.keys()));
+          currentState.evaluations.forEach((evaluation, key) => {
             console.log(`[QuestionSwiper] Evaluation for ${key}:`, evaluation);
           });
-          onComplete(state.responses, state.evaluations);
+          onComplete(currentState.responses, currentState.evaluations);
           return;
         }
 
         dispatch({ type: 'SET_CURRENT_INDEX', index: newIndex });
       }
     },
-    [questions, state.evaluations, state.responses, onComplete]
+    [questions, onComplete]
   );
 
   const viewabilityConfigRef = useRef({
